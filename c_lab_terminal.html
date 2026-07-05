@@ -1,0 +1,2761 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>C Lab Terminal — MCA412-1 Study System</title>
+    <style>
+      :root {
+        --paper: #f6f3ea;
+        --ink: #1c1a17;
+        --faint: #8a8377;
+        --line: #d9d2c2;
+        --pos: #0b6b3a;
+        --pos-bright: #12a15a;
+        --amber: #c8860b;
+        --red: #b23a2e;
+        --blue: #2f5d8a;
+        --chip: #eae4d5;
+        --receipt: #fffdf7;
+        --mono:
+          "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+        --sans: "Inter", -apple-system, system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--sans);
+        background-image: radial-gradient(
+          circle at 1px 1px,
+          rgba(0, 0, 0, 0.025) 1px,
+          transparent 0
+        );
+        background-size: 22px 22px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      /* ---- header ---- */
+      header {
+        border-bottom: 2px solid var(--ink);
+        background: var(--paper);
+        position: sticky;
+        top: 0;
+        z-index: 50;
+      }
+      .hbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        max-width: 1080px;
+        margin: 0 auto;
+      }
+      .logo {
+        font-family: var(--mono);
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--pos-bright);
+        box-shadow: 0 0 0 0 var(--pos-bright);
+        animation: pulse 2.4s infinite;
+      }
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(18, 161, 90, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 7px rgba(18, 161, 90, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(18, 161, 90, 0);
+        }
+      }
+      .hmeta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--faint);
+        text-align: right;
+      }
+      .progresswrap {
+        height: 3px;
+        background: var(--line);
+        width: 100%;
+      }
+      #globalprog {
+        height: 100%;
+        width: 0;
+        background: var(--pos-bright);
+        transition: width 0.4s ease;
+      }
+
+      /* ---- hero ---- */
+      .hero {
+        padding: 52px 0 30px;
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--pos);
+        font-weight: 600;
+      }
+      .hero h1 {
+        font-size: clamp(30px, 5vw, 52px);
+        line-height: 1.02;
+        margin: 14px 0 10px;
+        letter-spacing: -1.5px;
+        font-weight: 800;
+      }
+      .hero h1 .b {
+        color: var(--pos);
+      }
+      .hero p {
+        max-width: 560px;
+        color: #4a463d;
+        font-size: 16px;
+      }
+      .statline {
+        display: flex;
+        gap: 26px;
+        margin-top: 26px;
+        flex-wrap: wrap;
+      }
+      .stat {
+        font-family: var(--mono);
+      }
+      .stat b {
+        display: block;
+        font-size: 26px;
+        color: var(--ink);
+      }
+      .stat span {
+        font-size: 11px;
+        color: var(--faint);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      /* ---- tab nav ---- */
+      .tabscroll {
+        position: sticky;
+        top: 47px;
+        z-index: 40;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+        padding: 8px 0;
+        margin-bottom: 8px;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: thin;
+      }
+      .tabs::-webkit-scrollbar {
+        height: 5px;
+      }
+      .tabs::-webkit-scrollbar-thumb {
+        background: var(--line);
+        border-radius: 3px;
+      }
+      .tab {
+        flex: 0 0 auto;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        padding: 8px 13px;
+        border: 1px solid var(--line);
+        background: var(--receipt);
+        border-radius: 7px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: 0.15s;
+        color: #5a554b;
+        font-weight: 600;
+      }
+      .tab:hover {
+        border-color: var(--pos);
+        color: var(--pos);
+      }
+      .tab.active {
+        background: var(--ink);
+        color: var(--paper);
+        border-color: var(--ink);
+      }
+      .tab .done {
+        color: var(--pos-bright);
+        margin-left: 5px;
+      }
+      .tab.active .done {
+        color: var(--pos-bright);
+      }
+
+      /* ---- panels ---- */
+      .panel {
+        display: none;
+        animation: fade 0.35s ease;
+      }
+      .panel.show {
+        display: block;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .progtag {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--faint);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .panel h2 {
+        font-size: 27px;
+        margin: 6px 0 3px;
+        letter-spacing: -0.8px;
+        font-weight: 800;
+      }
+      .aim {
+        color: #4a463d;
+        font-size: 14.5px;
+        margin: 0 0 4px;
+        font-style: italic;
+      }
+      .filebadge {
+        font-family: var(--mono);
+        font-size: 11px;
+        background: var(--chip);
+        padding: 3px 8px;
+        border-radius: 5px;
+        display: inline-block;
+        margin: 8px 0 18px;
+        border: 1px solid var(--line);
+      }
+
+      /* ---- section accordion ---- */
+      .sec {
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        background: var(--receipt);
+        scroll-margin-top: 110px;
+      }
+      .sechead {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px 18px;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+      }
+      .sechead:hover {
+        background: #faf7ee;
+      }
+      .secnum {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--paper);
+        background: var(--pos);
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border-radius: 6px;
+        flex: 0 0 auto;
+      }
+      .sectitle {
+        font-weight: 700;
+        font-size: 15.5px;
+        flex: 1;
+      }
+      .sectitle small {
+        display: block;
+        font-weight: 400;
+        color: var(--faint);
+        font-size: 12px;
+        font-family: var(--sans);
+      }
+      .chev {
+        transition: transform 0.25s;
+        color: var(--faint);
+        font-size: 13px;
+        font-family: var(--mono);
+      }
+      .sec.open .chev {
+        transform: rotate(90deg);
+      }
+      .secbody {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s ease;
+      }
+      .sec.open .secbody {
+        max-height: 9000px;
+      }
+      .secinner {
+        padding: 2px 18px 20px;
+      }
+
+      /* ---- code ---- */
+      .code {
+        font-family: var(--mono);
+        font-size: 13px;
+        background: #1a1815;
+        color: #e8e2d4;
+        border-radius: 9px;
+        padding: 16px 16px 16px 0;
+        overflow-x: auto;
+        line-height: 1.65;
+        position: relative;
+        margin: 6px 0;
+      }
+      .code .ln {
+        display: flex;
+      }
+      .code .lno {
+        flex: 0 0 38px;
+        text-align: right;
+        padding-right: 12px;
+        color: #5c574d;
+        user-select: none;
+      }
+      .code .lc {
+        white-space: pre;
+        flex: 1;
+      }
+      .kw {
+        color: #e5896b;
+      }
+      .ty {
+        color: #6bb0e5;
+      }
+      .fn {
+        color: #d9c56b;
+      }
+      .str {
+        color: #8ecb7a;
+      }
+      .num {
+        color: #c99adf;
+      }
+      .cm {
+        color: #6d6a5f;
+        font-style: italic;
+      }
+      .pp {
+        color: #c88fd0;
+      }
+      .op {
+        color: #d4a0a0;
+      }
+      .code .ln.hl {
+        background: rgba(18, 161, 90, 0.16);
+        margin: 0 -16px 0 0;
+        padding-left: 0;
+      }
+      .reveal-row {
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+      .reveal-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .note {
+        display: none;
+        background: rgba(18, 161, 90, 0.1);
+        color: #bfe6cf;
+        padding: 4px 16px 4px 50px;
+        font-family: var(--sans);
+        font-size: 12.5px;
+        font-style: normal;
+        border-left: 2px solid var(--pos-bright);
+      }
+      .note.show {
+        display: block;
+      }
+      .hint {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--pos);
+        margin: 2px 0 10px;
+      }
+
+      /* ---- syntax cards ---- */
+      .scards {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 9px;
+      }
+      .scard {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 0;
+        overflow: hidden;
+        background: var(--paper);
+      }
+      .scard summary {
+        padding: 11px 14px;
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        list-style: none;
+      }
+      .scard summary::-webkit-details-marker {
+        display: none;
+      }
+      .scard summary .tok {
+        background: #1a1815;
+        color: #e5896b;
+        padding: 2px 7px;
+        border-radius: 5px;
+        font-size: 12px;
+      }
+      .scard summary .plus {
+        margin-left: auto;
+        color: var(--faint);
+        transition: transform 0.2s;
+      }
+      .scard[open] summary .plus {
+        transform: rotate(45deg);
+      }
+      .scard .sbody {
+        padding: 0 14px 14px;
+        font-size: 13.5px;
+      }
+      .scard .sbody p {
+        margin: 8px 0;
+      }
+      .scard .why {
+        color: var(--pos);
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .scard .trap {
+        background: #fbeee9;
+        border: 1px solid #e9c9be;
+        border-radius: 7px;
+        padding: 8px 11px;
+        font-size: 12.5px;
+        color: #7a3226;
+        margin-top: 8px;
+      }
+      .scard .trap b {
+        color: var(--red);
+      }
+
+      /* ---- memory diagram ---- */
+      .memwrap {
+        background: #14120f;
+        border-radius: 11px;
+        padding: 18px;
+        font-family: var(--mono);
+        color: #e8e2d4;
+        margin: 8px 0;
+      }
+      .memtop {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .memtop b {
+        color: var(--pos-bright);
+        font-size: 12px;
+        letter-spacing: 1px;
+      }
+      .memctrl {
+        display: flex;
+        gap: 6px;
+      }
+      .memctrl button {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: #2a2620;
+        color: #e8e2d4;
+        border: 1px solid #3d372e;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .memctrl button:hover:not(:disabled) {
+        background: var(--pos);
+        border-color: var(--pos);
+      }
+      .memctrl button:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .memstep {
+        font-size: 12px;
+        color: #9a9385;
+        margin-bottom: 12px;
+        min-height: 34px;
+        line-height: 1.45;
+      }
+      .memstep .exec {
+        color: #d9c56b;
+      }
+      .cells {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+      .cell {
+        border: 1px solid #3d372e;
+        border-radius: 7px;
+        padding: 8px 11px;
+        min-width: 82px;
+        transition: 0.3s;
+        background: #1d1a16;
+      }
+      .cell.changed {
+        border-color: var(--pos-bright);
+        background: rgba(18, 161, 90, 0.14);
+        transform: translateY(-2px);
+      }
+      .cell.dim {
+        opacity: 0.4;
+      }
+      .cell .cname {
+        font-size: 10px;
+        color: #8a8377;
+      }
+      .cell .cval {
+        font-size: 16px;
+        color: #e8e2d4;
+        font-weight: 600;
+      }
+      .cell.changed .cval {
+        color: var(--pos-bright);
+      }
+      .cell .caddr {
+        font-size: 9px;
+        color: #5c574d;
+        margin-top: 2px;
+      }
+      .ptrarrow {
+        color: var(--amber);
+        font-size: 11px;
+      }
+
+      /* ---- output terminal ---- */
+      .term {
+        background: #0d0d0d;
+        border-radius: 9px;
+        padding: 14px 16px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        color: #d0f0d0;
+        line-height: 1.6;
+        overflow-x: auto;
+        border: 1px solid #222;
+      }
+      .term .prompt {
+        color: #3fb96b;
+      }
+      .term .in {
+        color: #e5c07b;
+      }
+      .term .cursor {
+        display: inline-block;
+        width: 7px;
+        height: 14px;
+        background: #3fb96b;
+        animation: blink 1s steps(1) infinite;
+        vertical-align: middle;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* ---- better version ---- */
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .cbox {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        overflow: hidden;
+      }
+      .cbox .ch {
+        padding: 8px 13px;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .cbox.naive .ch {
+        background: #fbeee9;
+        color: var(--red);
+      }
+      .cbox.opt .ch {
+        background: #e6f2ea;
+        color: var(--pos);
+      }
+      .improve {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0 0;
+      }
+      .improve li {
+        padding: 9px 0 9px 26px;
+        position: relative;
+        font-size: 13.5px;
+        border-top: 1px dashed var(--line);
+      }
+      .improve li:before {
+        content: "▲";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        color: var(--pos);
+        font-size: 11px;
+      }
+      .improve li b {
+        color: var(--pos);
+      }
+      .cxbadge {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: var(--chip);
+        margin: 2px 4px 2px 0;
+      }
+
+      /* ---- quiz ---- */
+      .quiz {
+        border: 2px solid var(--ink);
+        border-radius: 12px;
+        padding: 20px;
+        background: var(--receipt);
+        margin-top: 4px;
+      }
+      .qhead {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      .qhead b {
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+      .qscore {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: var(--ink);
+        color: var(--paper);
+        padding: 4px 10px;
+        border-radius: 6px;
+      }
+      .q {
+        margin-bottom: 20px;
+        padding-bottom: 18px;
+        border-bottom: 1px dashed var(--line);
+      }
+      .q:last-child {
+        border: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+      .qtype {
+        font-family: var(--mono);
+        font-size: 10px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--amber);
+        font-weight: 700;
+      }
+      .qtext {
+        font-size: 14.5px;
+        margin: 6px 0 12px;
+        font-weight: 600;
+      }
+      .qtext code {
+        font-family: var(--mono);
+        background: var(--chip);
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .opts {
+        display: grid;
+        gap: 7px;
+      }
+      .opt {
+        text-align: left;
+        font-family: var(--sans);
+        font-size: 13.5px;
+        padding: 11px 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+        cursor: pointer;
+        transition: 0.13s;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .opt:hover:not(.locked) {
+        border-color: var(--ink);
+      }
+      .opt .mk {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--faint);
+        flex: 0 0 auto;
+        width: 18px;
+      }
+      .opt.correct {
+        background: #e6f2ea;
+        border-color: var(--pos);
+      }
+      .opt.wrong {
+        background: #fbeee9;
+        border-color: var(--red);
+      }
+      .opt.correct .mk {
+        color: var(--pos);
+      }
+      .opt.wrong .mk {
+        color: var(--red);
+      }
+      .opt.locked {
+        cursor: default;
+      }
+      .qexp {
+        display: none;
+        margin-top: 10px;
+        font-size: 13px;
+        background: var(--chip);
+        border-radius: 8px;
+        padding: 11px 13px;
+        line-height: 1.5;
+      }
+      .qexp.show {
+        display: block;
+      }
+      .qexp b {
+        color: var(--pos);
+      }
+      .fillrow {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .fillrow input {
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 8px 11px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--paper);
+        width: 150px;
+      }
+      .fillrow button,
+      .reveal-ans {
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 8px 14px;
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+        border-radius: 7px;
+        cursor: pointer;
+      }
+      .reveal-ans {
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      /* footer / completion */
+      .done-btn {
+        font-family: var(--mono);
+        font-size: 13px;
+        padding: 11px 20px;
+        border: 1px solid var(--pos);
+        background: var(--paper);
+        color: var(--pos);
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: 0.15s;
+        margin: 24px 0;
+      }
+      .done-btn:hover {
+        background: var(--pos);
+        color: #fff;
+      }
+      .done-btn.marked {
+        background: var(--pos);
+        color: #fff;
+      }
+      footer {
+        border-top: 2px solid var(--ink);
+        margin-top: 60px;
+        padding: 30px 0;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--faint);
+      }
+      .receipt-foot {
+        text-align: center;
+        letter-spacing: 1px;
+        line-height: 1.9;
+      }
+      .barcode {
+        height: 38px;
+        background: repeating-linear-gradient(
+          90deg,
+          var(--ink) 0 2px,
+          transparent 2px 4px,
+          var(--ink) 4px 5px,
+          transparent 5px 9px
+        );
+        max-width: 240px;
+        margin: 14px auto 8px;
+        opacity: 0.75;
+      }
+      @media (min-width: 760px) {
+        .scards {
+          grid-template-columns: 1fr 1fr;
+        }
+        .compare {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .tip {
+        font-size: 12px;
+        color: var(--faint);
+        font-style: italic;
+        margin: 14px 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="hbar">
+        <div class="logo"><span class="dot"></span>C-LAB://TERMINAL</div>
+        <div class="hmeta">
+          MCA412-1 · PROBLEM SOLVING USING C<br />SMART RETAIL DOMAIN · BATCH
+          2026–2028
+        </div>
+      </div>
+      <div class="progresswrap"><div id="globalprog"></div></div>
+    </header>
+
+    <div class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Interactive Lab Companion</div>
+        <h1>
+          Every lab program,<br /><span class="b">dismantled</span> and rebuilt.
+        </h1>
+        <p>
+          Eight programs from your lab manual — each broken into syntax you can
+          poke, code you reveal line by line, memory you watch change, and
+          quizzes that actually score you. Built around the manual's own Smart
+          Retail system.
+        </p>
+        <div class="statline">
+          <div class="stat"><b>8</b><span>Programs</span></div>
+          <div class="stat"><b>5</b><span>Units</span></div>
+          <div class="stat"><b id="qcount">0</b><span>Quiz points</span></div>
+          <div class="stat"><b id="progpct">0%</b><span>Completed</span></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="tabscroll">
+      <div class="wrap"><div class="tabs" id="tabs"></div></div>
+    </div>
+
+    <div class="wrap"><div id="panels"></div></div>
+
+    <footer>
+      <div class="wrap receipt-foot">
+        <div class="barcode"></div>
+        *** C-LAB TERMINAL — STUDY RECEIPT ***<br />
+        THANK YOU FOR LEARNING · NO REFUNDS ON EFFORT<br />
+        KEEP THIS COPY FOR YOUR EXAM <br />
+        MADE BY S V KAUSHIK, 2647151 MCAA
+      </div>
+    </footer>
+
+    <script>
+      /* ===== C-LAB DATA : programs 1-8 ===== */
+      /* code lines: {t: tokenized html, note: why-explanation (optional), hl:false} */
+      const PROGRAMS = [
+        /* ============ PROGRAM 1 ============ */
+        {
+          id: "p1",
+          unit: "Unit 1",
+          tab: "1 · Operators",
+          title: "Retail Invoice Generator",
+          aim: "Use arithmetic, relational, logical, ternary & shorthand operators to build a POS bill.",
+          file: "retail_operators.c",
+          syntax: [
+            {
+              tok: 'scanf("%f", &var)',
+              why: "Reads formatted input",
+              body: "<code>%f</code> reads a <b>float</b>; the <code>&</code> passes the variable's <i>address</i> so scanf can write into it. Format specifier must match the type exactly.",
+              trap: "Using <code>%d</code> for a float (or forgetting <code>&</code>) is the #1 cause of garbage values. <code>%f</code>→float, <code>%lf</code>→double, <code>%d</code>→int.",
+            },
+            {
+              tok: "(float)quantity",
+              why: "Explicit type cast",
+              body: "Forces <code>int quantity</code> to be treated as <code>float</code> during the multiply. Here it's defensive — it guarantees floating-point math even if the other operand were an int.",
+              trap: "Integer division bites silently: <code>5/2</code> is <code>2</code>, not <code>2.5</code>. Cast <i>before</i> dividing, not after.",
+            },
+            {
+              tok: "(cond) ? a : b",
+              why: "Ternary conditional operator",
+              body: "A one-line if/else that <i>returns a value</i>. <code>discount = offerEligible ? 50.0 : 0.0</code> means 'if eligible use 50 else 0'.",
+              trap: "Don't nest more than one deep — <code>a?b?c:d:e</code> is unreadable. Use if/else once it branches.",
+            },
+            {
+              tok: "&& and ||",
+              why: "Logical AND / OR",
+              body: "Combine booleans. <code>&&</code> is true only if both sides are; <code>||</code> if either is. They <b>short-circuit</b>: if the left of <code>&&</code> is false, the right is never evaluated.",
+              trap: "Confusing <code>&&</code> (logical) with <code>&</code> (bitwise). <code>1 & 2</code> is 0; <code>1 && 2</code> is 1.",
+            },
+            {
+              tok: "subtotal -= discount",
+              why: "Compound assignment",
+              body: "Shorthand for <code>subtotal = subtotal - discount</code>. Also <code>+= *= /= %=</code>. Cleaner and signals intent.",
+              trap: "<code>=-</code> is not <code>-=</code>. <code>x =- 5</code> assigns -5; <code>x -= 5</code> subtracts. Spacing hides bugs.",
+            },
+            {
+              tok: "(int)finalBill / 10",
+              why: "Cast + integer division",
+              body: "Casts the float bill to int (truncating decimals), then integer-divides by 10 to award 1 point per $10. Truncation is deliberate here — you don't award fractional points.",
+              trap: "Precedence: cast binds tighter than <code>/</code>, so this is <code>((int)finalBill)/10</code>, which is what we want.",
+            },
+          ],
+          code: [
+            {
+              t: '<span class="pp">#include &lt;stdio.h&gt;</span>',
+              note: "Pulls in printf/scanf. Without it the compiler warns about implicit declarations.",
+            },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">float</span> itemPrice, subtotal, discount, tax, finalBill;',
+              note: "Five floats live on the stack — money needs decimals.",
+            },
+            { t: '  <span class="ty">int</span> quantity, loyaltyPoints;' },
+            {
+              t: '  <span class="ty">int</span> isMember; <span class="cm">// int as boolean: 0/1</span>',
+              note: "Pre-C99 C has no bool type; int stands in. 0=false, non-zero=true.",
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"===== SMART RETAIL POS =====\\n"</span>);',
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Enter Product Price: "</span>);',
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%f"</span>, &amp;itemPrice);',
+              note: "& gives scanf the address so it can store your input into itemPrice.",
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;quantity);',
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;isMember);',
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;loyaltyPoints);',
+            },
+            {
+              t: '  subtotal = itemPrice * (<span class="ty">float</span>)quantity;',
+              note: "1200.0 * 1 = 1200.0. The cast keeps it in float land.",
+              hl: true,
+            },
+            {
+              t: '  <span class="ty">int</span> isPremium = (loyaltyPoints &gt; <span class="num">500</span>);',
+              note: "Relational operator yields 1 (600>500 is true) or 0.",
+            },
+            {
+              t: '  <span class="ty">int</span> offerEligible = (isMember == <span class="num">1</span>) && (subtotal &gt; <span class="num">1000</span> || isPremium == <span class="num">1</span>);',
+              note: "member(1) AND (1200>1000 → true). Whole thing = 1.",
+              hl: true,
+            },
+            {
+              t: '  discount = (offerEligible) ? <span class="num">50.0</span> : <span class="num">0.0</span>;',
+              note: "Eligible → $50 flat discount.",
+              hl: true,
+            },
+            {
+              t: '  subtotal -= discount; <span class="cm">// 1200 - 50 = 1150</span>',
+              hl: true,
+            },
+            {
+              t: '  tax = subtotal * <span class="num">0.05</span>; <span class="cm">// 1150 * .05 = 57.5</span>',
+              hl: true,
+            },
+            {
+              t: '  finalBill = subtotal + tax; <span class="cm">// 1207.50</span>',
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"TOTAL PAYABLE : $%.2f\\n"</span>, finalBill);',
+              note: "%.2f rounds display to 2 decimals — money formatting.",
+            },
+            {
+              t: '  <span class="ty">int</span> pointsEarned = (<span class="ty">int</span>)finalBill / <span class="num">10</span>;',
+              note: "(int)1207.5 = 1207, /10 = 120.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Points Earned : %d\\n"</span>, pointsEarned);',
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: price=1200, qty=1, member=1, points=600",
+            vars: [
+              "itemPrice",
+              "quantity",
+              "isMember",
+              "loyaltyPoints",
+              "subtotal",
+              "isPremium",
+              "offerEligible",
+              "discount",
+              "tax",
+              "finalBill",
+            ],
+            steps: [
+              {
+                desc: "Inputs read from scanf into the stack.",
+                set: {
+                  itemPrice: "1200.0",
+                  quantity: "1",
+                  isMember: "1",
+                  loyaltyPoints: "600",
+                },
+                chg: ["itemPrice", "quantity", "isMember", "loyaltyPoints"],
+              },
+              {
+                desc: "<span class='exec'>subtotal = itemPrice * (float)quantity</span> → 1200.0",
+                set: { subtotal: "1200.0" },
+                chg: ["subtotal"],
+              },
+              {
+                desc: "<span class='exec'>isPremium = (600 > 500)</span> → 1",
+                set: { isPremium: "1" },
+                chg: ["isPremium"],
+              },
+              {
+                desc: "<span class='exec'>offerEligible = (1==1) && (1200>1000 || 1)</span> → 1",
+                set: { offerEligible: "1" },
+                chg: ["offerEligible"],
+              },
+              {
+                desc: "<span class='exec'>discount = eligible ? 50 : 0</span> → 50.0",
+                set: { discount: "50.0" },
+                chg: ["discount"],
+              },
+              {
+                desc: "<span class='exec'>subtotal -= discount</span> → 1150.0",
+                set: { subtotal: "1150.0" },
+                chg: ["subtotal"],
+              },
+              {
+                desc: "<span class='exec'>tax = 1150 * 0.05</span> → 57.5",
+                set: { tax: "57.5" },
+                chg: ["tax"],
+              },
+              {
+                desc: "<span class='exec'>finalBill = 1150 + 57.5</span> → 1207.5",
+                set: { finalBill: "1207.5" },
+                chg: ["finalBill"],
+              },
+            ],
+          },
+          output: [
+            { p: "Enter Product Price: ", i: "1200" },
+            { p: "Enter Quantity: ", i: "1" },
+            { p: "Is the customer a Loyalty Member? (1/0): ", i: "1" },
+            { p: "Enter Customer's current Loyalty Points: ", i: "600" },
+            { o: "TOTAL PAYABLE : $1207.50" },
+            { o: "Points Earned : 120" },
+          ],
+          better: {
+            naive:
+              "Recomputes <code>itemPrice*quantity</code> inside printf instead of reusing subtotal; mixes int/float casts ad-hoc; uses magic numbers (0.05, 500, 10).",
+            improvements: [
+              "<b>Name your constants:</b> <code>const float TAX_RATE = 0.05f;</code> and <code>#define PREMIUM_PTS 500</code>. When tax law changes you edit one line.",
+              "<b>Validate input:</b> check <code>scanf</code>'s return value (<code>if(scanf(...)!=1)</code>) so garbage input doesn't silently corrupt the bill.",
+              "<b>Use <code>_Bool</code>/<code>stdbool.h</code>:</b> <code>bool isMember</code> documents intent better than an int flag.",
+              "<b>Round money properly:</b> <code>%.2f</code> only rounds display. For real currency, work in integer cents to dodge float rounding drift.",
+            ],
+            complexity: [
+              "Time: O(1)",
+              "Space: O(1)",
+              "All scalars on stack — no heap needed",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: "With price=100, qty=3, member=0, points=200 — is the customer <code>offerEligible</code>?",
+              opts: [
+                "Yes, subtotal is 300",
+                "No — not a member",
+                "Yes — points make them premium",
+                "Error",
+              ],
+              ans: 1,
+              exp: "<b>No.</b> The rule is <code>isMember==1 && (...)</code>. member=0 fails the AND immediately (short-circuit), so eligibility is 0 regardless of subtotal or points.",
+            },
+            {
+              type: "spot-the-bug",
+              q: "A student writes <code>subtotal =- discount;</code> to subtract. What actually happens?",
+              opts: [
+                "Subtracts discount correctly",
+                "Assigns -discount to subtotal",
+                "Compile error",
+                "Nothing changes",
+              ],
+              ans: 1,
+              exp: "<b>Assigns negative discount.</b> <code>=-</code> is parsed as <code>= (-discount)</code>, not <code>-=</code>. subtotal becomes -50. A classic spacing trap.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Complete: award 1 point per $10 → <code>int pts = (____)finalBill / 10;</code>",
+              answer: "int",
+              exp: "<code>(int)</code> truncates the float before integer division so you get whole points.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 2 ============ */
+        {
+          id: "p2",
+          unit: "Unit 1",
+          tab: "2 · Precedence",
+          title: "Inventory Valuation & Tax Calculator",
+          aim: "Show how operator precedence and parentheses change financial totals.",
+          file: "precedence.c",
+          syntax: [
+            {
+              tok: "* / before + -",
+              why: "Arithmetic precedence",
+              body: "Multiplication and division bind tighter than addition/subtraction. <code>a + b * c</code> is <code>a + (b*c)</code>. This is why untaxed items sneak through if you forget parentheses.",
+              trap: "<code>price*qty + price2*qty2 * tax</code> taxes ONLY the last term. Group first: <code>(...)*tax</code>.",
+            },
+            {
+              tok: "( ) grouping",
+              why: "Override precedence",
+              body: "Parentheses force evaluation order. <code>(laptopPrice*laptopQty + phonePrice*phoneQty) * (1+taxRate)</code> sums first, then taxes the whole basket.",
+              trap: "Missing one paren silently gives a wrong-but-plausible number — the worst kind of bug in billing.",
+            },
+            {
+              tok: "Left-to-right associativity",
+              why: "Same-precedence tie-break",
+              body: "<code>a / b * c</code> — <code>/</code> and <code>*</code> tie, so C goes left→right: <code>(a/b)*c</code>. Order matters with integers due to truncation.",
+              trap: "<code>(1000+500)/2*1</code> → 750, but written as <code>1000+500/2*1</code> it'd be 1250. Precedence, not intuition.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">float</span> laptopPrice = <span class="num">1000.00</span>, phonePrice = <span class="num">500.00</span>;',
+            },
+            {
+              t: '  <span class="ty">int</span> laptopQty = <span class="num">2</span>, phoneQty = <span class="num">3</span>;',
+            },
+            {
+              t: '  <span class="ty">float</span> taxRate = <span class="num">0.10</span>, totalValue;',
+            },
+            {
+              t: '  <span class="cm">// WRONG would be: lp*lq + pp*pq*tax  → only phones taxed</span>',
+              note: "Precedence taxes just the last product — a real billing bug.",
+            },
+            {
+              t: '  totalValue = (laptopPrice * laptopQty + phonePrice * phoneQty) * (<span class="num">1</span> + taxRate);',
+              note: "Parens sum the basket (2000+1500=3500) THEN apply 1.10 → 3850.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Final Inventory Value: $%.2f\\n"</span>, totalValue);',
+            },
+            {
+              t: '  <span class="ty">float</span> averagePrice = (laptopPrice + phonePrice) / <span class="num">2</span> * <span class="num">1</span>;',
+              note: "(1500)/2=750, *1=750. Left-to-right associativity.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Average Product Price: $%.2f\\n"</span>, averagePrice);',
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: fixed values, watch precedence resolve",
+            vars: [
+              "laptopPrice",
+              "phonePrice",
+              "laptopQty",
+              "phoneQty",
+              "taxRate",
+              "totalValue",
+              "averagePrice",
+            ],
+            steps: [
+              {
+                desc: "Constants initialised on the stack.",
+                set: {
+                  laptopPrice: "1000.0",
+                  phonePrice: "500.0",
+                  laptopQty: "2",
+                  phoneQty: "3",
+                  taxRate: "0.10",
+                },
+                chg: [
+                  "laptopPrice",
+                  "phonePrice",
+                  "laptopQty",
+                  "phoneQty",
+                  "taxRate",
+                ],
+              },
+              {
+                desc: "<span class='exec'>laptopPrice*laptopQty</span> = 2000 (inner, done first)",
+                set: {},
+                chg: [],
+              },
+              {
+                desc: "<span class='exec'>phonePrice*phoneQty</span> = 1500 (inner)",
+                set: {},
+                chg: [],
+              },
+              {
+                desc: "Sum inside parens = 3500, then <span class='exec'>× (1+0.10)</span> = 3850",
+                set: { totalValue: "3850.0" },
+                chg: ["totalValue"],
+              },
+              {
+                desc: "<span class='exec'>(1000+500)/2*1</span> → 1500/2=750 →×1 = 750",
+                set: { averagePrice: "750.0" },
+                chg: ["averagePrice"],
+              },
+            ],
+          },
+          output: [
+            { o: "Final Inventory Value: $3850.00" },
+            { o: "Average Product Price: $750.00" },
+          ],
+          better: {
+            naive:
+              "Hard-codes prices/quantities so it can only value one fixed basket; taxRate as float invites rounding error on money.",
+            improvements: [
+              "<b>Loop over an array of items</b> so the valuation works for any basket size, not just 2 lines.",
+              "<b>Group defensively even when 'unnecessary'</b> — explicit parens document intent and survive future edits.",
+              "<b>Integer cents for currency</b> avoids <code>0.10</code> float representation error accumulating across many items.",
+            ],
+            complexity: [
+              "Time: O(1) fixed / O(n) if looped over n items",
+              "Space: O(1)",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: "What does <code>2 + 3 * 4 - 1</code> evaluate to in C?",
+              opts: ["19", "13", "20", "16"],
+              ans: 1,
+              exp: "<b>13.</b> <code>3*4=12</code> first (higher precedence), then <code>2+12-1 = 13</code>. Not left-to-right arithmetic.",
+            },
+            {
+              type: "spot-the-bug",
+              q: "<code>total = price*qty + price2*qty2 * taxRate;</code> — what's wrong for a basket total?",
+              opts: [
+                "Nothing",
+                "Only the second item gets taxed",
+                "It taxes everything twice",
+                "Syntax error",
+              ],
+              ans: 1,
+              exp: "<b>Only item 2 is taxed.</b> <code>*</code> binds before <code>+</code>, so it's <code>(price*qty) + (price2*qty2*taxRate)</code>. Wrap the sum: <code>(...)* (1+taxRate)</code>.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Tax the whole basket: <code>total = (a*qa + b*qb) ____ (1+tax);</code>",
+              answer: "*",
+              exp: "Multiply the parenthesised subtotal by <code>(1+tax)</code>.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 3 ============ */
+        {
+          id: "p3",
+          unit: "Unit 2",
+          tab: "3 · Decision & Loops",
+          title: "Automated Checkout & Loyalty System",
+          aim: "if-else for stock checks, while for multi-item billing, switch-case for payment.",
+          file: "checkout.c",
+          syntax: [
+            {
+              tok: "while(cond){...}",
+              why: "Pre-tested loop",
+              body: "Checks the condition <i>before</i> each pass. Used here to keep scanning items while the user types 'y'. If the condition is false at the start, the body never runs.",
+              trap: "Forgetting to update the condition variable inside → infinite loop. Here <code>cont</code> must be re-read each round.",
+            },
+            {
+              tok: "if / else if / else",
+              why: "Branching ladder",
+              body: "Tests conditions top-down; first true branch wins, rest skipped. Order matters: put the most specific/likely test first.",
+              trap: "<code>if(qty=0)</code> assigns instead of compares. Use <code>==</code>. Also missing braces on multi-line branches.",
+            },
+            {
+              tok: "switch(x){case:}",
+              why: "Multi-way dispatch on a value",
+              body: "Jumps to the matching <code>case</code>. Cleaner than a long if-ladder for discrete integer choices like a payment menu.",
+              trap: "Missing <code>break;</code> causes fall-through — execution spills into the next case. <code>default</code> catches unexpected values.",
+            },
+            {
+              tok: "break / continue",
+              why: "Loop jumps",
+              body: "<code>break</code> exits the loop entirely (here when stock hits 0). <code>continue</code> skips to the next iteration. Both apply to the innermost loop only.",
+              trap: "<code>break</code> in nested loops exits ONE level, not all. Students expect it to break out of everything.",
+            },
+            {
+              tok: 'scanf(" %c", &c)',
+              why: "Reading a char safely",
+              body: "The leading space skips leftover whitespace/newline from a previous scanf. Without it, <code>%c</code> grabs the stray '\\n' and the loop misbehaves.",
+              trap: "Omitting the space is the classic 'my loop ran once and quit' bug.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">int</span> stock = <span class="num">20</span>, orderQty, mode;',
+            },
+            {
+              t: '  <span class="ty">float</span> price = <span class="num">150.0</span>, total = <span class="num">0</span>;',
+            },
+            {
+              t: '  <span class="ty">char</span> cont = <span class="str">\'y\'</span>;',
+              note: "Seed the loop control so the while runs at least once.",
+            },
+            {
+              t: '  <span class="kw">while</span> (cont == <span class="str">\'y\'</span> || cont == <span class="str">\'Y\'</span>) {',
+              note: "Accept lower/upper y. Condition checked before each pass.",
+              hl: true,
+            },
+            {
+              t: '    <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;orderQty);',
+            },
+            {
+              t: '    <span class="kw">if</span> (orderQty &gt; stock) {',
+              note: "Reject over-orders first.",
+              hl: true,
+            },
+            {
+              t: '      <span class="fn">printf</span>(<span class="str">"Insufficient stock!\\n"</span>);',
+            },
+            {
+              t: '    } <span class="kw">else if</span> (orderQty &lt;= <span class="num">0</span>) {',
+              hl: true,
+            },
+            {
+              t: '      <span class="fn">printf</span>(<span class="str">"Invalid quantity.\\n"</span>);',
+            },
+            { t: '    } <span class="kw">else</span> {' },
+            {
+              t: "      total += (orderQty * price);",
+              note: "Compound assign accumulates the running bill.",
+              hl: true,
+            },
+            { t: "      stock -= orderQty;", hl: true },
+            { t: "    }" },
+            {
+              t: '    <span class="kw">if</span> (stock &lt;= <span class="num">0</span>) <span class="kw">break</span>;',
+              note: "Exit loop when shelf empties.",
+              hl: true,
+            },
+            {
+              t: '    <span class="fn">scanf</span>(<span class="str">" %c"</span>, &amp;cont);',
+              note: "Leading space eats the leftover newline — critical.",
+              hl: true,
+            },
+            { t: "  }" },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;mode);',
+            },
+            { t: '  <span class="kw">switch</span>(mode) {', hl: true },
+            {
+              t: '    <span class="kw">case</span> <span class="num">1</span>: <span class="fn">printf</span>(<span class="str">"Bill: %.2f (No Fee)\\n"</span>, total); <span class="kw">break</span>;',
+              note: "break stops fall-through into case 2.",
+              hl: true,
+            },
+            {
+              t: '    <span class="kw">case</span> <span class="num">2</span>: <span class="fn">printf</span>(<span class="str">"Bill: %.2f (+2%% Card)\\n"</span>, total*<span class="num">1.02</span>); <span class="kw">break</span>;',
+              hl: true,
+            },
+            {
+              t: '    <span class="kw">default</span>: <span class="fn">printf</span>(<span class="str">"Bill: %.2f\\n"</span>, total);',
+              note: "Catches any mode that isn't 1 or 2.",
+              hl: true,
+            },
+            { t: "  }" },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: order 5, then 10, then 6(reject), pay=2",
+            vars: ["stock", "orderQty", "total", "cont", "mode"],
+            steps: [
+              {
+                desc: "Init: stock=20, total=0, cont='y'",
+                set: { stock: "20", total: "0.0", cont: "'y'" },
+                chg: ["stock", "total", "cont"],
+              },
+              {
+                desc: "Round 1: qty=5 ≤ stock. <span class='exec'>total += 5*150</span>=750, <span class='exec'>stock -= 5</span>=15",
+                set: { orderQty: "5", total: "750.0", stock: "15" },
+                chg: ["orderQty", "total", "stock"],
+              },
+              {
+                desc: "cont='y'. Round 2: qty=10. total=750+1500=<span class='exec'>2250</span>, stock=<span class='exec'>5</span>",
+                set: { orderQty: "10", total: "2250.0", stock: "5" },
+                chg: ["orderQty", "total", "stock"],
+              },
+              {
+                desc: "Round 3: qty=6 &gt; stock(5) → 'Insufficient!'. total & stock unchanged.",
+                set: { orderQty: "6" },
+                chg: ["orderQty"],
+              },
+              {
+                desc: "cont='n' → loop condition false, exit.",
+                set: { cont: "'n'" },
+                chg: ["cont"],
+              },
+              {
+                desc: "mode=2 → <span class='exec'>switch case 2</span>: 2250*1.02 = 2295.00",
+                set: { mode: "2" },
+                chg: ["mode"],
+              },
+            ],
+          },
+          output: [
+            { p: "Current Stock: 20. Enter Quantity: ", i: "5" },
+            { o: "Added to cart. Subtotal: 750.00" },
+            { p: "Add more items? (y/n): ", i: "y" },
+            { p: "Current Stock: 15. Enter Quantity: ", i: "10" },
+            { o: "Added to cart. Subtotal: 2250.00" },
+            { p: "Add more items? (y/n): ", i: "y" },
+            { p: "Current Stock: 5. Enter Quantity: ", i: "6" },
+            { o: "Insufficient stock!" },
+            { p: "Add more items? (y/n): ", i: "n" },
+            { p: "Payment Method: 1.Cash 2.Card: ", i: "2" },
+            { o: "Final Bill: 2295.00 (2% Card Fee Included)" },
+          ],
+          better: {
+            naive:
+              "Fixed single price for every item; no cap on the loop; card fee magic number 1.02 inline; no re-prompt on invalid quantity.",
+            improvements: [
+              "<b>Guard scanf return</b> so non-numeric input doesn't spin the loop forever.",
+              "<b>Extract the fee</b>: <code>#define CARD_FEE 0.02f</code> — one place to change pricing policy.",
+              "<b>Per-item price</b> via a parallel array or struct so different products cost differently — sets up Unit 5.",
+              "<b>Prefer <code>do-while</code></b> when the body must run at least once (menus), signalling intent over the <code>cont='y'</code> seed hack.",
+            ],
+            complexity: [
+              "Time: O(n) for n checkout rounds",
+              "Space: O(1)",
+              "switch compiles to a jump table — faster than a long if-ladder for dense integer cases",
+            ],
+          },
+          quiz: [
+            {
+              type: "spot-the-bug",
+              q: 'Remove the space in <code>scanf("%c",&cont);</code>. What breaks?',
+              opts: [
+                "Nothing",
+                "It reads the leftover '\\n' and the loop ends early",
+                "Compile error",
+                "Stock goes negative",
+              ],
+              ans: 1,
+              exp: "<b>Reads a stray newline.</b> The previous <code>scanf(\"%d\")</code> leaves '\\n' in the buffer; <code>%c</code> grabs it, cont≠'y', loop exits after one item. The leading space skips whitespace.",
+            },
+            {
+              type: "predict-the-output",
+              q: "If every <code>break;</code> is deleted from the switch and mode=1, what prints?",
+              opts: [
+                "Only the case 1 line",
+                "case 1, case 2, AND default all run",
+                "Nothing",
+                "Error",
+              ],
+              ans: 1,
+              exp: "<b>All three — fall-through.</b> Without <code>break</code>, execution flows from case 1 into case 2 into default. This is the switch trap.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Exit the loop the instant stock is depleted: <code>if(stock&lt;=0) ____;</code>",
+              answer: "break",
+              exp: "<code>break</code> terminates the nearest enclosing loop immediately.",
+            },
+          ],
+        },
+      ];
+      /* ===== programs 4-8, pushed onto PROGRAMS ===== */
+      PROGRAMS.push(
+        /* ============ PROGRAM 4 ============ */
+        {
+          id: "p4",
+          unit: "Unit 3",
+          tab: "4 · 2D Arrays",
+          title: "Warehouse Aisle-Shelf Mapper",
+          aim: "Use a 2D array to model 3 aisles × 2 shelves and sum stock.",
+          file: "warehouse.c",
+          syntax: [
+            {
+              tok: "int warehouse[3][2]",
+              why: "2D array declaration",
+              body: "Reserves 3×2 = 6 contiguous ints. First index = row (aisle), second = column (shelf). Stored <b>row-major</b>: all of row 0, then row 1, then row 2, in memory.",
+              trap: "<code>[3][2]</code> means valid indices 0–2 and 0–1. <code>warehouse[3][2]</code> is out of bounds — undefined behaviour, no error.",
+            },
+            {
+              tok: "nested for loops",
+              why: "Traverse rows × columns",
+              body: "Outer loop walks aisles, inner walks shelves. The inner loop completes fully for each outer step — that's how you visit every cell exactly once.",
+              trap: "Swapping <code>i</code> and <code>j</code> in the subscript transposes your access pattern and can read wrong/OOB cells.",
+            },
+            {
+              tok: "total += arr[i][j]",
+              why: "Accumulate across cells",
+              body: "Running sum touched once per cell. Because access follows memory order (row-major), it's also cache-friendly.",
+              trap: "Column-major traversal (<code>arr[j][i]</code>) on a large matrix thrashes the cache — same result, slower.",
+            },
+            {
+              tok: 'scanf("%d",&arr[i][j])',
+              why: "Write into a cell",
+              body: "<code>&warehouse[i][j]</code> is the address of one cell. scanf stores the typed number there.",
+              trap: "Forgetting <code>&</code> passes the value, not the address — scanf writes to a garbage location.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">int</span> warehouse[<span class="num">3</span>][<span class="num">2</span>];',
+              note: "6 ints laid out contiguously, row by row.",
+              hl: true,
+            },
+            {
+              t: '  <span class="ty">int</span> i, j, total = <span class="num">0</span>;',
+            },
+            {
+              t: '  <span class="kw">for</span> (i = <span class="num">0</span>; i &lt; <span class="num">3</span>; i++) {',
+              note: "Outer = aisle.",
+              hl: true,
+            },
+            {
+              t: '    <span class="kw">for</span> (j = <span class="num">0</span>; j &lt; <span class="num">2</span>; j++) {',
+              note: "Inner = shelf. Runs fully for each aisle.",
+              hl: true,
+            },
+            {
+              t: '      <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;warehouse[i][j]);',
+              note: "Store input into cell [i][j].",
+              hl: true,
+            },
+            {
+              t: "      total += warehouse[i][j];",
+              note: "Add each cell to grand total.",
+              hl: true,
+            },
+            { t: "    }" },
+            { t: "  }" },
+            { t: '  <span class="cm">// print the grid back</span>' },
+            {
+              t: '  <span class="kw">for</span> (i = <span class="num">0</span>; i &lt; <span class="num">3</span>; i++) {',
+            },
+            {
+              t: '    <span class="kw">for</span> (j = <span class="num">0</span>; j &lt; <span class="num">2</span>; j++)',
+            },
+            {
+              t: '      <span class="fn">printf</span>(<span class="str">"[%d] "</span>, warehouse[i][j]);',
+            },
+            {
+              t: '    <span class="fn">printf</span>(<span class="str">"\\n"</span>);',
+              note: "Newline after each aisle row.",
+            },
+            { t: "  }" },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Grand Total: %d units\\n"</span>, total);',
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: filling the 3×2 grid with 10 20 / 15 25 / 30 40",
+            vars: [
+              "[0][0]",
+              "[0][1]",
+              "[1][0]",
+              "[1][1]",
+              "[2][0]",
+              "[2][1]",
+              "total",
+            ],
+            steps: [
+              {
+                desc: "All cells uninitialised (garbage) at start. total=0.",
+                set: { total: "0" },
+                chg: ["total"],
+              },
+              {
+                desc: "i=0,j=0: store 10. <span class='exec'>total=10</span>",
+                set: { "[0][0]": "10", total: "10" },
+                chg: ["[0][0]", "total"],
+              },
+              {
+                desc: "i=0,j=1: store 20. total=30",
+                set: { "[0][1]": "20", total: "30" },
+                chg: ["[0][1]", "total"],
+              },
+              {
+                desc: "i=1,j=0: store 15. total=45",
+                set: { "[1][0]": "15", total: "45" },
+                chg: ["[1][0]", "total"],
+              },
+              {
+                desc: "i=1,j=1: store 25. total=70",
+                set: { "[1][1]": "25", total: "70" },
+                chg: ["[1][1]", "total"],
+              },
+              {
+                desc: "i=2,j=0: store 30. total=100",
+                set: { "[2][0]": "30", total: "100" },
+                chg: ["[2][0]", "total"],
+              },
+              {
+                desc: "i=2,j=1: store 40. <span class='exec'>total=140</span>",
+                set: { "[2][1]": "40", total: "140" },
+                chg: ["[2][1]", "total"],
+              },
+            ],
+          },
+          output: [
+            { p: "Aisle 1, Shelf 1 Stock: ", i: "10" },
+            { p: "Aisle 1, Shelf 2 Stock: ", i: "20" },
+            { p: "Aisle 2, Shelf 1 Stock: ", i: "15" },
+            { p: "Aisle 2, Shelf 2 Stock: ", i: "25" },
+            { p: "Aisle 3, Shelf 1 Stock: ", i: "30" },
+            { p: "Aisle 3, Shelf 2 Stock: ", i: "40" },
+            { o: "Warehouse Map:" },
+            { o: "[10] [20]" },
+            { o: "[15] [25]" },
+            { o: "[30] [40]" },
+            { o: "Grand Total Inventory: 140 units" },
+          ],
+          better: {
+            naive:
+              "Dimensions 3 and 2 are hard-coded in six places; resizing the warehouse means hunting every literal.",
+            improvements: [
+              "<b><code>#define AISLES 3</code> / <code>#define SHELVES 2</code></b> — change the store layout in one spot.",
+              "<b>Bounds are your job:</b> C never checks array indices at runtime. A stray <code>[3]</code> corrupts memory silently — guard your loop limits.",
+              "<b>Keep row-major traversal</b> (<code>[i][j]</code> with i outer) so memory access is sequential and cache-friendly on big grids.",
+              "<b>For a truly dynamic size</b> read at runtime, use <code>malloc</code> (Unit 4) instead of a fixed VLA.",
+            ],
+            complexity: [
+              "Time: O(rows × cols) — must touch every cell",
+              "Space: O(rows × cols) contiguous on stack",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: "For <code>int a[3][2]</code>, how many <code>int</code>s are allocated?",
+              opts: ["5", "6", "3", "2"],
+              ans: 1,
+              exp: "<b>6.</b> 3 rows × 2 columns = 6 contiguous ints, stored row-major.",
+            },
+            {
+              type: "spot-the-bug",
+              q: "A loop uses <code>for(i=0;i&lt;=3;i++)</code> on <code>a[3][2]</code>. What's the risk?",
+              opts: [
+                "Nothing",
+                "Reads a[3][…] — out of bounds, undefined behaviour",
+                "Compile error",
+                "Prints twice",
+              ],
+              ans: 1,
+              exp: "<b>Out-of-bounds.</b> Valid rows are 0,1,2. <code>&lt;=3</code> touches row index 3, which doesn't exist. C won't stop you — it just corrupts/reads junk.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: 'Store input into a cell: <code>scanf("%d", ____ warehouse[i][j]);</code>',
+              answer: "&",
+              exp: "<code>&</code> gives scanf the cell's address to write into.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 5 ============ */
+        {
+          id: "p5",
+          unit: "Unit 3",
+          tab: "5 · Strings",
+          title: "Product Branding & Category Validator",
+          aim: "Use strlen, strcpy, strcmp to manage product labels.",
+          file: "strings.c",
+          syntax: [
+            {
+              tok: "#include <string.h>",
+              why: "String function library",
+              body: "Declares <code>strlen</code>, <code>strcpy</code>, <code>strcmp</code> and friends. C strings are just char arrays ending in a hidden <code>'\\0'</code> — these functions rely on that terminator.",
+              trap: "Forgetting this header gives implicit-declaration warnings and can crash on 64-bit systems.",
+            },
+            {
+              tok: "char name[50]",
+              why: "A C string is a char array",
+              body: "Holds up to 49 characters + 1 null terminator <code>'\\0'</code>. There is no separate 'string' type in C.",
+              trap: "Off-by-one: a 50-char array holds a 49-char string. The <code>'\\0'</code> needs a slot.",
+            },
+            {
+              tok: "strlen(s)",
+              why: "Length up to (not including) '\\0'",
+              body: 'Counts characters until the null terminator. "Laptop" → 6. Returns <code>size_t</code>, cast to int for <code>%d</code> here.',
+              trap: "strlen walks the whole string each call — O(n). Don't call it inside a loop condition on a huge string.",
+            },
+            {
+              tok: "strcpy(dst,src)",
+              why: "Copy a string",
+              body: "Copies src into dst including the <code>'\\0'</code>. Used to duplicate the product name into a label buffer.",
+              trap: "<b>No bounds check.</b> If src is longer than dst, it overflows — a real security hole. Prefer <code>strncpy</code>/<code>snprintf</code>.",
+            },
+            {
+              tok: "strcmp(a,b)==0",
+              why: "Compare strings",
+              body: "Returns 0 when equal, &lt;0 or &gt;0 for lexical order. <code>==0</code> means 'they match'.",
+              trap: "<code>a == b</code> compares <i>addresses</i>, not contents. Always use <code>strcmp</code> for text equality.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="pp">#include &lt;string.h&gt;</span>',
+              note: "Required for strlen/strcpy/strcmp.",
+              hl: true,
+            },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">char</span> prodName[<span class="num">50</span>], category[<span class="num">20</span>] = <span class="str">"Electronics"</span>, copy[<span class="num">50</span>];',
+              note: "Three char buffers; category pre-filled.",
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%s"</span>, prodName);',
+              note: "%s stops at whitespace; no & needed (array name IS an address).",
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Length: %d\\n"</span>, (<span class="ty">int</span>)<span class="fn">strlen</span>(prodName));',
+              note: "\"Laptop\"→6, counting to but not including '\\0'.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">strcpy</span>(copy, prodName);',
+              note: "Duplicate the name into the label buffer.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"ID Label: %s\\n"</span>, copy);',
+            },
+            {
+              t: '  <span class="kw">if</span> (<span class="fn">strcmp</span>(prodName, <span class="str">"Laptop"</span>) == <span class="num">0</span>) {',
+              note: "strcmp==0 means the strings match exactly.",
+              hl: true,
+            },
+            {
+              t: '    <span class="fn">printf</span>(<span class="str">"Matches Category: %s\\n"</span>, category);',
+            },
+            { t: '  } <span class="kw">else</span> {' },
+            {
+              t: '    <span class="fn">printf</span>(<span class="str">"Category: General\\n"</span>);',
+            },
+            { t: "  }" },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: input \"Laptop\" — watch the char array + '\\0'",
+            vars: ["prodName", "copy", "strlen", "strcmp"],
+            steps: [
+              {
+                desc: "scanf fills prodName = L a p t o p \\0",
+                set: { prodName: '"Laptop\\0"' },
+                chg: ["prodName"],
+              },
+              {
+                desc: "<span class='exec'>strlen(prodName)</span> counts 6 chars before '\\0'",
+                set: { strlen: "6" },
+                chg: ["strlen"],
+              },
+              {
+                desc: "<span class='exec'>strcpy(copy,prodName)</span> duplicates all 7 bytes incl '\\0'",
+                set: { copy: '"Laptop\\0"' },
+                chg: ["copy"],
+              },
+              {
+                desc: "<span class='exec'>strcmp(prodName,\"Laptop\")</span> → 0 (equal)",
+                set: { strcmp: "0" },
+                chg: ["strcmp"],
+              },
+              {
+                desc: "0 == 0 true → print category 'Electronics'",
+                set: {},
+                chg: [],
+              },
+            ],
+          },
+          output: [
+            { p: "Enter Product Name: ", i: "Laptop" },
+            { o: "Length of Name: 6" },
+            { o: "ID Label Created: Laptop" },
+            { o: "Matches Category: Electronics" },
+            { o: "--- second run: input Phone ---" },
+            { o: "Length of Name: 5" },
+            { o: "ID Label Created: Phone" },
+            { o: "Category: General" },
+          ],
+          better: {
+            naive:
+              '<code>scanf("%s")</code> has no width limit — a long name overflows the 50-byte buffer. <code>strcpy</code> is equally unbounded.',
+            improvements: [
+              "<b>Bound the read:</b> <code>scanf(\"%49s\", prodName)</code> caps input at 49 chars + '\\0'.",
+              "<b>Use <code>strncpy</code> or <code>snprintf</code></b> so an oversized source can't smash the destination buffer.",
+              '<b>Case-insensitive match:</b> real product lookups should use <code>strcasecmp</code> so "laptop" == "Laptop".',
+              "<b>Cache the length</b> if you use it repeatedly — strlen re-scans the whole string every call (O(n)).",
+            ],
+            complexity: [
+              "strlen/strcpy/strcmp each O(n) in string length",
+              "Space: O(n) for the copy buffer",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: '<code>strlen("Retail")</code> returns what?',
+              opts: ["7 (includes '\\0')", "6", "5", "Depends on system"],
+              ans: 1,
+              exp: "<b>6.</b> strlen counts characters up to but NOT including the null terminator. R-e-t-a-i-l = 6.",
+            },
+            {
+              type: "spot-the-bug",
+              q: 'To test equality a student writes <code>if(prodName == "Laptop")</code>. Why is it wrong?',
+              opts: [
+                "It works fine",
+                "It compares addresses, not the text",
+                "Syntax error",
+                "Always true",
+              ],
+              ans: 1,
+              exp: "<b>Compares pointers.</b> <code>==</code> on char arrays checks if they're the same memory location — almost never true. Use <code>strcmp(a,b)==0</code>.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: 'Safely cap the input width: <code>scanf("%____s", prodName);</code> for a char[50]',
+              answer: "49",
+              exp: "49 chars + 1 for '\\0' fills the 50-byte buffer without overflow.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 6 ============ */
+        {
+          id: "p6",
+          unit: "Unit 4",
+          tab: "6 · Functions",
+          title: "Modular Tax & Discount Calculator",
+          aim: "Build reusable functions for repeatable price calculations.",
+          file: "functions.c",
+          syntax: [
+            {
+              tok: "float calculateTax(float amount)",
+              why: "Function definition",
+              body: "Return type <code>float</code>, name, and a typed parameter. The function receives a <b>copy</b> of the argument (pass-by-value) and returns a computed value.",
+              trap: "Mismatched return type vs. declared type, or forgetting to return a value, gives garbage or warnings.",
+            },
+            {
+              tok: "return expr;",
+              why: "Send a value back",
+              body: "Evaluates the expression and hands it to the caller. <code>return amount*0.05;</code> computes tax and exits the function.",
+              trap: "Code after <code>return</code> is unreachable. Every non-void path must return something.",
+            },
+            {
+              tok: "pass-by-value",
+              why: "Arguments are copied",
+              body: "<code>calculateTax(price)</code> copies price's value in. Changes to the parameter inside don't affect the caller's variable — safe isolation.",
+              trap: "Expecting a function to modify a passed int/float directly — it can't without pointers (that's Program 7).",
+            },
+            {
+              tok: "function reuse",
+              why: "Call the same logic anywhere",
+              body: "Defined once, <code>calculateTax</code> and <code>applyDiscount</code> can be called on any amount — the essence of modular programming.",
+              trap: "Define functions <i>before</i> main, or forward-declare a prototype, or the compiler complains about implicit declaration.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="ty">float</span> <span class="fn">calculateTax</span>(<span class="ty">float</span> amount) { <span class="kw">return</span> amount * <span class="num">0.05</span>; }',
+              note: "Reusable: 5% of whatever amount you pass.",
+              hl: true,
+            },
+            {
+              t: '<span class="ty">float</span> <span class="fn">applyDiscount</span>(<span class="ty">float</span> amount) { <span class="kw">return</span> (amount &gt; <span class="num">1000</span>) ? amount * <span class="num">0.1</span> : <span class="num">0</span>; }',
+              note: "Ternary inside a function — 10% off if over 1000, else 0.",
+              hl: true,
+            },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            { t: '  <span class="ty">float</span> price;' },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%f"</span>, &amp;price);',
+            },
+            {
+              t: '  <span class="ty">float</span> tax = <span class="fn">calculateTax</span>(price);',
+              note: "price copied in; 60.0 returned for 1200.",
+              hl: true,
+            },
+            {
+              t: '  <span class="ty">float</span> disc = <span class="fn">applyDiscount</span>(price);',
+              note: "1200>1000 → 120.0 returned.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Tax: %.2f  Disc: %.2f  Final: %.2f\\n"</span>, tax, disc, price + tax - disc);',
+              note: "1200 + 60 - 120 = 1140.",
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: price=1200 — watch the call stack frames",
+            vars: ["price", "tax", "disc", "amount(param)"],
+            steps: [
+              {
+                desc: "main reads price=1200 onto main's stack frame.",
+                set: { price: "1200.0" },
+                chg: ["price"],
+              },
+              {
+                desc: "Call <span class='exec'>calculateTax(1200)</span>: a NEW frame copies amount=1200.",
+                set: { "amount(param)": "1200.0 (copy)" },
+                chg: ["amount(param)"],
+              },
+              {
+                desc: "Returns 1200*0.05=60. Frame destroyed. <span class='exec'>tax=60</span>",
+                set: { tax: "60.0", "amount(param)": "— freed" },
+                chg: ["tax", "amount(param)"],
+              },
+              {
+                desc: "Call <span class='exec'>applyDiscount(1200)</span>: fresh copy, 1200>1000 → 120",
+                set: { "amount(param)": "1200.0 (copy)", disc: "120.0" },
+                chg: ["amount(param)", "disc"],
+              },
+              {
+                desc: "Final = 1200 + 60 - 120 = <span class='exec'>1140.0</span>",
+                set: { "amount(param)": "— freed" },
+                chg: ["amount(param)"],
+              },
+            ],
+          },
+          output: [
+            { p: "Enter Total Bill: ", i: "1200" },
+            { o: "Tax: 60.00" },
+            { o: "Discount: 120.00" },
+            { o: "Final: 1140.00" },
+          ],
+          better: {
+            naive:
+              "Rates 0.05 and 0.1 and threshold 1000 are buried in function bodies; each policy change means editing code.",
+            improvements: [
+              "<b>Parameterise the rates:</b> <code>float calcTax(float amt, float rate)</code> makes the function reusable across tax regions.",
+              "<b>Add prototypes</b> in a header so functions can live in a separate .c file — real modular structure.",
+              "<b>Return via <code>const</code> inputs</b> where you don't mutate — documents that the argument is read-only.",
+              "<b>Guard division/negatives</b>: reject negative amounts before computing so the bill can't go absurd.",
+            ],
+            complexity: [
+              "Each function O(1)",
+              "Space: O(1) per call frame, freed on return",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: "With bill=800, what does <code>applyDiscount(800)</code> return?",
+              opts: ["80", "0", "800", "8"],
+              ans: 1,
+              exp: "<b>0.</b> The ternary is <code>(amount>1000)?...:0</code>. 800 is not > 1000, so the else branch returns 0.",
+            },
+            {
+              type: "spot-the-bug",
+              q: "A student expects <code>calculateTax(price)</code> to also change <code>price</code>. Does it?",
+              opts: [
+                "Yes, functions modify arguments",
+                "No — pass-by-value copies it",
+                "Only for floats",
+                "Only with return",
+              ],
+              ans: 1,
+              exp: "<b>No.</b> C passes a copy. The function works on its own <code>amount</code>; the caller's <code>price</code> is untouched. To modify the original you'd need a pointer (Program 7).",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Send the result back to the caller: <code>float calculateTax(float a){ ____ a*0.05; }</code>",
+              answer: "return",
+              exp: "<code>return</code> hands the computed value back and exits the function.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 7 ============ */
+        {
+          id: "p7",
+          unit: "Unit 4",
+          tab: "7 · Pointers",
+          title: "Global Stock Synchronizer",
+          aim: "Modify the actual inventory variable via its address (call-by-reference).",
+          file: "pointers.c",
+          syntax: [
+            {
+              tok: "int *s",
+              why: "Pointer declaration",
+              body: "<code>s</code> holds the <i>address</i> of an int, not an int. The <code>*</code> in the declaration says 'pointer to int'. This is how a function can reach back and change the caller's variable.",
+              trap: "<code>int *p, q;</code> declares p as pointer but q as a plain int. The <code>*</code> attaches to the name, not the type.",
+            },
+            {
+              tok: "&currentStock",
+              why: "Address-of operator",
+              body: "Produces the memory address of currentStock so it can be passed to a pointer parameter. This is the 'call by reference' handoff.",
+              trap: "Passing the value (<code>updateStock(currentStock,...)</code>) instead of the address means the function can't modify the original.",
+            },
+            {
+              tok: "*s = *s - sold",
+              why: "Dereference & write",
+              body: "<code>*s</code> means 'the int that s points to'. Reading <code>*s</code> gets 100; writing <code>*s = ...</code> changes the original currentStock in main directly.",
+              trap: "Confusing <code>*s</code> (the pointed-to value) with <code>s</code> (the address itself). <code>s = 70</code> would point s at address 70 — a bug.",
+            },
+            {
+              tok: "call by reference",
+              why: "Function edits caller's data",
+              body: "By passing an address, updateStock reaches across the call boundary and mutates currentStock. Contrast Program 6, where copies stayed isolated.",
+              trap: "Dereferencing an uninitialised or NULL pointer crashes (segfault). Always point at valid memory first.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="ty">void</span> <span class="fn">updateStock</span>(<span class="ty">int</span> *s, <span class="ty">int</span> sold) {',
+              note: "s is a pointer to main's currentStock.",
+              hl: true,
+            },
+            {
+              t: '  *s = *s - sold; <span class="cm">// write through the pointer</span>',
+              note: "Reads the pointed value, subtracts, writes it back to the ORIGINAL.",
+              hl: true,
+            },
+            { t: "}" },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="ty">int</span> currentStock = <span class="num">100</span>, soldQty;',
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;soldQty);',
+            },
+            {
+              t: '  <span class="fn">updateStock</span>(&amp;currentStock, soldQty);',
+              note: "&currentStock passes the address — call by reference.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Updated Stock: %d\\n"</span>, currentStock);',
+              note: "Prints 70 — the original was actually changed.",
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: currentStock=100, sold=30 — pointer writes through",
+            vars: ["currentStock", "soldQty", "s (ptr)", "*s"],
+            steps: [
+              {
+                desc: "main: currentStock=100 at (say) address 0xA4. soldQty read=30.",
+                set: { currentStock: "100", soldQty: "30" },
+                chg: ["currentStock", "soldQty"],
+              },
+              {
+                desc: "Call updateStock(&currentStock,30): <span class='exec'>s = 0xA4</span> (points at currentStock)",
+                set: { "s (ptr)": "0xA4 →", "*s": "100" },
+                chg: ["s (ptr)", "*s"],
+              },
+              {
+                desc: "<span class='exec'>*s = *s - sold</span> = 100-30 = 70, written through the pointer",
+                set: { "*s": "70", currentStock: "70" },
+                chg: ["*s", "currentStock"],
+              },
+              {
+                desc: "Function returns. currentStock in main is now <span class='exec'>70</span> — genuinely modified.",
+                set: { "s (ptr)": "— freed" },
+                chg: ["currentStock"],
+              },
+            ],
+          },
+          output: [
+            { p: "Current Stock: 100\\nEnter quantity sold: ", i: "30" },
+            { o: "Updated Inventory Stock: 70" },
+          ],
+          better: {
+            naive:
+              "No NULL check on the pointer; no guard against selling more than in stock (stock could go negative).",
+            improvements: [
+              "<b>Validate the pointer:</b> <code>if(s == NULL) return;</code> before dereferencing prevents segfaults.",
+              "<b>Guard the domain:</b> refuse <code>sold > *s</code> so inventory never goes negative.",
+              "<b>Use <code>*s -= sold;</code></b> — the compound form is clearer and identical in effect.",
+              "<b>Mark read-only pointers <code>const</code></b> (<code>const int *p</code>) when a function shouldn't write, so the compiler enforces intent.",
+            ],
+            complexity: [
+              "Time: O(1)",
+              "Space: O(1) — the pointer is one machine word",
+              "Call-by-reference avoids copying large data — the real payoff on structs/arrays",
+            ],
+          },
+          quiz: [
+            {
+              type: "predict-the-output",
+              q: "If <code>*s = *s - sold;</code> were changed to <code>s = *s - sold;</code>, what happens?",
+              opts: [
+                "Same result, 70",
+                "Compiler warning/UB — s now holds value 70 as an address",
+                "Prints 30",
+                "Stock becomes 130",
+              ],
+              ans: 1,
+              exp: "<b>Bug.</b> <code>s = 70</code> makes the pointer point at address 70; it doesn't change currentStock. main still prints 100 (and you've created a dangerous pointer).",
+            },
+            {
+              type: "spot-the-bug",
+              q: "A student calls <code>updateStock(currentStock, 30)</code> (no <code>&</code>). Result?",
+              opts: [
+                "Works, stock=70",
+                "Passes a value as an address — undefined behaviour/crash",
+                "Stock unchanged, prints 100",
+                "Compiles cleanly and is correct",
+              ],
+              ans: 1,
+              exp: "<b>Wrong.</b> Without <code>&</code> you pass the value 100 where a pointer is expected. The compiler warns; at runtime it treats 100 as an address — undefined behaviour. You must pass <code>&currentStock</code>.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Read/write the pointed-to value inside the function: <code>____s = ____s - sold;</code>",
+              answer: "*",
+              exp: "<code>*s</code> dereferences — it means 'the value s points to'. Both blanks are <code>*</code>.",
+            },
+          ],
+        },
+        /* ============ PROGRAM 8 ============ */
+        {
+          id: "p8",
+          unit: "Unit 5",
+          tab: "8 · Structs + Files",
+          title: "Mini Retail Ledger (File Handling)",
+          aim: "Use a structure + file I/O to save sales records permanently.",
+          file: "ledger.c",
+          syntax: [
+            {
+              tok: "struct Sale { ... }",
+              why: "Group related fields",
+              body: "Bundles an int id, a char[30] name, and a float amount into one real-world entity: a sale. Access fields with the dot operator <code>s.id</code>.",
+              trap: "Struct fields have padding between them for alignment — <code>sizeof</code> is often larger than the sum of fields (covered below).",
+            },
+            {
+              tok: "FILE *fp",
+              why: "File handle pointer",
+              body: "A pointer to the file's control structure. Everything you do to the file goes through this handle returned by <code>fopen</code>.",
+              trap: "If <code>fopen</code> fails it returns <b>NULL</b>. Using a NULL fp crashes. Always check before writing.",
+            },
+            {
+              tok: 'fopen(name,"a")',
+              why: "Open in append mode",
+              body: '<code>"a"</code> opens for writing at the END of the file, creating it if missing. Existing records are preserved — new sales are added below.',
+              trap: '<code>"w"</code> truncates (erases) the file! Using "w" instead of "a" wipes your ledger every run.',
+            },
+            {
+              tok: "fprintf(fp, ...)",
+              why: "Formatted write to file",
+              body: "Like printf but the output goes to the file via fp instead of the screen. Writes one formatted ledger line per sale.",
+              trap: "Format specifiers must match the struct field types, same as printf.",
+            },
+            {
+              tok: "fclose(fp)",
+              why: "Flush & release",
+              body: "Writes any buffered data to disk and frees the handle. Skipping it can lose the last records (still in buffer) and leak the handle.",
+              trap: "Forgetting fclose is why 'my file is empty even though the program ran' — data never got flushed.",
+            },
+            {
+              tok: "s.id  (dot operator)",
+              why: "Access a struct field",
+              body: "<code>s.id</code>, <code>s.name</code>, <code>s.amount</code> reach into the struct instance. Use <code>-></code> instead when you have a pointer to a struct.",
+              trap: "<code>s->id</code> on a non-pointer, or <code>s.id</code> on a pointer, is a type error.",
+            },
+          ],
+          code: [
+            { t: '<span class="pp">#include &lt;stdio.h&gt;</span>' },
+            {
+              t: '<span class="kw">struct</span> Sale {',
+              note: "Blueprint for one sale record.",
+              hl: true,
+            },
+            { t: '  <span class="ty">int</span> id;' },
+            {
+              t: '  <span class="ty">char</span> name[<span class="num">30</span>];',
+            },
+            { t: '  <span class="ty">float</span> amount;' },
+            { t: "};" },
+            {
+              t: '<span class="ty">int</span> <span class="fn">main</span>() {',
+            },
+            {
+              t: '  <span class="kw">struct</span> Sale s;',
+              note: "One instance on the stack.",
+            },
+            {
+              t: '  FILE *fp = <span class="fn">fopen</span>(<span class="str">"sales.txt"</span>, <span class="str">"a"</span>);',
+              note: "Append mode — never erases existing records.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%d"</span>, &amp;s.id);',
+              note: "Dot operator: write into the id field.",
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%s"</span>, s.name);',
+            },
+            {
+              t: '  <span class="fn">scanf</span>(<span class="str">"%f"</span>, &amp;s.amount);',
+            },
+            {
+              t: '  <span class="fn">fprintf</span>(fp, <span class="str">"ID:%d | Item:%s | $%.2f\\n"</span>, s.id, s.name, s.amount);',
+              note: "Write one formatted line to the file, not the screen.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">fclose</span>(fp);',
+              note: "Flush buffer to disk & release the handle — without this the file may stay empty.",
+              hl: true,
+            },
+            {
+              t: '  <span class="fn">printf</span>(<span class="str">"Record added to ledger.\\n"</span>);',
+            },
+            {
+              t: '  <span class="kw">return</span> <span class="num">0</span>;',
+            },
+            { t: "}" },
+          ],
+          mem: {
+            title: "Trace: input 101 / Mouse / 499.50 — struct + file",
+            vars: ["s.id", "s.name", "s.amount", "fp", "sales.txt"],
+            steps: [
+              {
+                desc: 'fopen("sales.txt","a") → fp points at the open file (or NULL on failure).',
+                set: { fp: "0x7f… (valid)", "sales.txt": "[existing rows…]" },
+                chg: ["fp"],
+              },
+              {
+                desc: "scanf fills the struct fields: id=101",
+                set: { "s.id": "101" },
+                chg: ["s.id"],
+              },
+              {
+                desc: 'name="Mouse", amount=499.50',
+                set: { "s.name": '"Mouse"', "s.amount": "499.50" },
+                chg: ["s.name", "s.amount"],
+              },
+              {
+                desc: "<span class='exec'>fprintf(fp,...)</span> appends one line to the file buffer",
+                set: { "sales.txt": "…+ ID:101 | Item:Mouse | $499.50" },
+                chg: ["sales.txt"],
+              },
+              {
+                desc: "<span class='exec'>fclose(fp)</span> flushes buffer to disk — the row is now permanent.",
+                set: { fp: "— closed" },
+                chg: ["fp", "sales.txt"],
+              },
+            ],
+          },
+          output: [
+            { p: "Item ID: ", i: "101" },
+            { p: "Item Name: ", i: "Mouse" },
+            { p: "Total Price: ", i: "499.50" },
+            { o: "Record added to ledger. Check 'sales.txt'." },
+            { o: "--- inside sales.txt ---" },
+            { o: "ID:101 | Item:Mouse | $499.50" },
+          ],
+          better: {
+            naive:
+              'Never checks if <code>fopen</code> returned NULL; <code>scanf("%s")</code> can overflow name[30]; text format is fine for humans but slow to reload/parse.',
+            improvements: [
+              '<b>Check the handle:</b> <code>if(fp==NULL){ printf("Cannot open ledger"); return 1; }</code> — the single most important fix.',
+              '<b>Bound the name read:</b> <code>scanf("%29s", s.name)</code> stops buffer overflow.',
+              "<b>Binary mode for reload:</b> <code>fwrite(&s,sizeof(s),1,fp)</code> stores the raw struct — faster and exact when you later <code>fread</code> it back.",
+              "<b>Struct padding matters:</b> <code>int(4)+char[30]+float(4)</code> won't be exactly 38 — alignment pads it (often 40). Order fields big→small to shrink padding.",
+              "<b>Atomic writes:</b> for a real ledger, write to a temp file then rename, so a crash mid-write can't corrupt the master.",
+            ],
+            complexity: [
+              "Time: O(1) per record write",
+              "Space: O(1) — one struct on the stack",
+              "File append is O(1); full reload is O(n) records",
+            ],
+          },
+          quiz: [
+            {
+              type: "spot-the-bug",
+              q: 'A student opens the ledger with <code>"w"</code> instead of <code>"a"</code>. What happens each run?',
+              opts: [
+                "Nothing changes",
+                "The file is erased and only the newest record survives",
+                "It appends normally",
+                "Compile error",
+              ],
+              ans: 1,
+              exp: '<b>The file gets wiped.</b> <code>"w"</code> truncates on open. Every run erases all prior sales and writes just one. <code>"a"</code> preserves history.',
+            },
+            {
+              type: "predict-the-output",
+              q: "If <code>fclose(fp)</code> is removed, what's the likely symptom?",
+              opts: [
+                "Faster program, same file",
+                "The file may be empty — buffered data never flushed",
+                "Segfault always",
+                "Doubles every record",
+              ],
+              ans: 1,
+              exp: "<b>Possibly empty file.</b> Writes are buffered; <code>fclose</code> flushes them to disk. Without it the last (or all) records can be lost.",
+            },
+            {
+              type: "fill-in-the-blank",
+              q: "Guard against a failed open: <code>if(fp == ____) return 1;</code>",
+              answer: "NULL",
+              exp: "<code>fopen</code> returns <code>NULL</code> on failure — always check before using fp.",
+            },
+          ],
+        },
+      );
+    </script>
+    <script>
+      /* ================= C-LAB APP ================= */
+      const state = {
+        active: 0,
+        done: new Set(),
+        quizScore: 0,
+        quizMax: 0,
+        quizAnswered: new Set(),
+      };
+
+      const tabsEl = document.getElementById("tabs");
+      const panelsEl = document.getElementById("panels");
+
+      /* ---------- build tabs ---------- */
+      PROGRAMS.forEach((p, idx) => {
+        const t = document.createElement("button");
+        t.className = "tab";
+        t.dataset.idx = idx;
+        t.innerHTML = `${p.tab}<span class="done" data-done="${p.id}" style="display:none">✓</span>`;
+        t.onclick = () => activate(idx);
+        tabsEl.appendChild(t);
+      });
+
+      /* ---------- build panels ---------- */
+      PROGRAMS.forEach((p, idx) => {
+        const panel = document.createElement("div");
+        panel.className = "panel";
+        panel.id = "panel-" + p.id;
+        panel.dataset.idx = idx;
+        panel.innerHTML = renderPanel(p, idx);
+        panelsEl.appendChild(panel);
+      });
+
+      function renderPanel(p, idx) {
+        return `
+  <div class="progtag">${p.unit} · Program ${idx + 1} of ${PROGRAMS.length}</div>
+  <h2>${p.title}</h2>
+  <p class="aim">${p.aim}</p>
+  <div class="filebadge">📄 ${p.file}</div>
+
+  ${section(1, "Syntax Breakdown", "Tap each element — what it does, why it's here, the trap", renderSyntax(p), true)}
+  ${section(2, "Line-by-Line Walkthrough", "Click any highlighted line to reveal the reasoning", renderCode(p), true)}
+  ${section(3, "Execution & Memory", "Step through and watch variables change", renderMem(p) + renderOutput(p))}
+  ${section(4, "Storage & The Better Version", "How an expert would rewrite this", renderBetter(p))}
+  ${section(5, "Test Me", "Scored quiz — no peeking", renderQuiz(p, idx))}
+
+  <button class="done-btn" data-mark="${idx}" onclick="markDone(${idx})">Mark Program ${idx + 1} complete ✓</button>
+  `;
+      }
+
+      function section(n, title, sub, inner, open) {
+        return `<div class="sec${open ? " open" : ""}">
+    <div class="sechead" onclick="this.parentNode.classList.toggle('open')">
+      <span class="secnum">${n}</span>
+      <span class="sectitle">${title}<small>${sub}</small></span>
+      <span class="chev">▶</span>
+    </div>
+    <div class="secbody"><div class="secinner">${inner}</div></div>
+  </div>`;
+      }
+
+      /* ---------- syntax cards ---------- */
+      function renderSyntax(p) {
+        return (
+          `<div class="scards">` +
+          p.syntax
+            .map(
+              (s) => `
+    <details class="scard">
+      <summary><span class="tok">${escapeHTML(s.tok)}</span>${s.why ? "" : ""}<span class="plus">+</span></summary>
+      <div class="sbody">
+        <div class="why">Why here</div>
+        <p>${s.body}</p>
+        ${s.trap ? `<div class="trap"><b>Trap:</b> ${s.trap}</div>` : ""}
+      </div>
+    </details>`,
+            )
+            .join("") +
+          `</div>`
+        );
+      }
+
+      /* ---------- code with reveal ---------- */
+      function renderCode(p) {
+        let html = `<p class="hint">▸ highlighted lines are clickable</p><div class="code">`;
+        p.code.forEach((l, i) => {
+          const has = !!l.note;
+          html += `<div class="ln${l.hl ? " hl" : ""}${has ? " reveal-row" : ""}" ${has ? `onclick="toggleNote(this)"` : ""}>
+      <span class="lno">${i + 1}</span><span class="lc">${l.t}</span></div>`;
+          if (has) html += `<div class="note">💡 ${l.note}</div>`;
+        });
+        html += `</div>`;
+        return html;
+      }
+      function toggleNote(row) {
+        const n = row.nextElementSibling;
+        if (n && n.classList.contains("note")) n.classList.toggle("show");
+      }
+
+      /* ---------- memory stepper ---------- */
+      function renderMem(p) {
+        const m = p.mem;
+        return `<div class="memwrap" id="mem-${p.id}">
+    <div class="memtop"><b>MEMORY · ${m.title}</b>
+      <div class="memctrl">
+        <button onclick="memStep('${p.id}',-1)" data-prev>◂ Back</button>
+        <button onclick="memStep('${p.id}',1)" data-next>Step ▸</button>
+        <button onclick="memReset('${p.id}')">↺ Reset</button>
+      </div>
+    </div>
+    <div class="memstep" data-step>Press <b>Step ▸</b> to begin the trace.</div>
+    <div class="cells" data-cells></div>
+  </div>`;
+      }
+      const memPos = {},
+        memVals = {};
+      function memInit(id) {
+        const p = PROGRAMS.find((x) => x.id === id);
+        memPos[id] = -1;
+        memVals[id] = {};
+        p.mem.vars.forEach((v) => (memVals[id][v] = "—"));
+        drawCells(id, []);
+        const w = document.getElementById("mem-" + id);
+        w.querySelector("[data-step]").innerHTML =
+          "Press <b>Step ▸</b> to begin the trace.";
+        updateMemBtns(id);
+      }
+      function memStep(id, dir) {
+        const p = PROGRAMS.find((x) => x.id === id);
+        const steps = p.mem.steps;
+        let pos = memPos[id] + dir;
+        if (pos < -1) pos = -1;
+        if (pos >= steps.length) pos = steps.length - 1;
+        // rebuild values from scratch up to pos (so Back works cleanly)
+        memVals[id] = {};
+        p.mem.vars.forEach((v) => (memVals[id][v] = "—"));
+        let chg = [];
+        for (let k = 0; k <= pos; k++) {
+          const st = steps[k];
+          for (const key in st.set) memVals[id][key] = st.set[key];
+          if (k === pos) chg = st.chg || [];
+        }
+        memPos[id] = pos;
+        const w = document.getElementById("mem-" + id);
+        w.querySelector("[data-step]").innerHTML =
+          pos < 0
+            ? "Press <b>Step ▸</b> to begin the trace."
+            : `<b>Step ${pos + 1}/${steps.length}:</b> ${steps[pos].desc}`;
+        drawCells(id, chg);
+        updateMemBtns(id);
+      }
+      function memReset(id) {
+        memInit(id);
+      }
+      function updateMemBtns(id) {
+        const p = PROGRAMS.find((x) => x.id === id);
+        const w = document.getElementById("mem-" + id);
+        w.querySelector("[data-prev]").disabled = memPos[id] < 0;
+        w.querySelector("[data-next]").disabled =
+          memPos[id] >= p.mem.steps.length - 1;
+      }
+      function drawCells(id, chg) {
+        const p = PROGRAMS.find((x) => x.id === id);
+        const box = document
+          .getElementById("mem-" + id)
+          .querySelector("[data-cells]");
+        box.innerHTML = p.mem.vars
+          .map((v) => {
+            const val = memVals[id][v];
+            const isChg = chg.includes(v);
+            const dim = val === "—";
+            return `<div class="cell${isChg ? " changed" : ""}${dim ? " dim" : ""}">
+      <div class="cname">${escapeHTML(v)}</div>
+      <div class="cval">${escapeHTML(val)}</div></div>`;
+          })
+          .join("");
+      }
+
+      /* ---------- output terminal ---------- */
+      function renderOutput(p) {
+        let html = `<p class="tip">Program output (■ input you type, plain = printed):</p><div class="term">`;
+        p.output.forEach((o) => {
+          if (o.p !== undefined) {
+            html += `<div><span class="prompt">${escapeHTML(o.p)}</span><span class="in">${escapeHTML(o.i || "")}</span></div>`;
+          } else {
+            html += `<div>${escapeHTML(o.o)}</div>`;
+          }
+        });
+        html += `<span class="cursor"></span></div>`;
+        return html;
+      }
+
+      /* ---------- better version ---------- */
+      function renderBetter(p) {
+        const b = p.better;
+        return `
+  <div class="compare">
+    <div class="cbox naive"><div class="ch">◇ The naive version</div>
+      <div style="padding:12px 14px;font-size:13.5px">${b.naive}</div></div>
+    <div class="cbox opt"><div class="ch">▲ Expert improvements</div>
+      <ul class="improve">${b.improvements.map((i) => `<li>${i}</li>`).join("")}</ul></div>
+  </div>
+  <p class="tip" style="margin-top:14px">Complexity & storage:</p>
+  <div>${b.complexity.map((c) => `<span class="cxbadge">${escapeHTML(c)}</span>`).join("")}</div>`;
+      }
+
+      /* ---------- quiz ---------- */
+      function renderQuiz(p, idx) {
+        let html = `<div class="quiz" id="quiz-${p.id}">
+    <div class="qhead"><b>▸ ${p.title} — Test</b>
+      <span class="qscore" data-qscore>0 / ${p.quiz.length}</span></div>`;
+        p.quiz.forEach((q, qi) => {
+          const qid = `${p.id}-${qi}`;
+          html += `<div class="q"><div class="qtype">${q.type}</div><div class="qtext">${q.q}</div>`;
+          if (q.opts) {
+            html +=
+              `<div class="opts">` +
+              q.opts
+                .map(
+                  (o, oi) => `
+        <button class="opt" onclick="answerMC('${p.id}',${qi},${oi},${q.ans})">
+          <span class="mk">${String.fromCharCode(65 + oi)}</span><span>${o}</span></button>`,
+                )
+                .join("") +
+              `</div>`;
+          } else {
+            html += `<div class="fillrow">
+        <input type="text" id="fill-${qid}" placeholder="type answer…" autocomplete="off">
+        <button onclick="answerFill('${p.id}',${qi},'${(q.answer || "").replace(/'/g, "\\'")}')">Check</button>
+        <button class="reveal-ans" onclick="document.getElementById('fill-${qid}').value='${(q.answer || "").replace(/'/g, "\\'")}';answerFill('${p.id}',${qi},'${(q.answer || "").replace(/'/g, "\\'")}')">Reveal</button>
+      </div>`;
+          }
+          html += `<div class="qexp" id="exp-${qid}">${q.exp}</div></div>`;
+        });
+        html += `</div>`;
+        return html;
+      }
+
+      function answerMC(pid, qi, chosen, correct) {
+        const key = `${pid}-${qi}`;
+        const quiz = document.getElementById("quiz-" + pid);
+        const qBlock = quiz.querySelectorAll(".q")[qi];
+        if (qBlock.dataset.locked) return;
+        qBlock.dataset.locked = "1";
+        const opts = qBlock.querySelectorAll(".opt");
+        opts.forEach((o, i) => {
+          o.classList.add("locked");
+          if (i === correct) o.classList.add("correct");
+          if (i === chosen && chosen !== correct) o.classList.add("wrong");
+        });
+        document.getElementById("exp-" + key).classList.add("show");
+        if (chosen === correct) bumpScore(pid, key, true);
+        else bumpScore(pid, key, false);
+      }
+      function answerFill(pid, qi, answer) {
+        const key = `${pid}-${qi}`;
+        const quiz = document.getElementById("quiz-" + pid);
+        const qBlock = quiz.querySelectorAll(".q")[qi];
+        const inp = document.getElementById("fill-" + key);
+        const val = (inp.value || "").trim().toLowerCase();
+        const ok = val === answer.trim().toLowerCase();
+        document.getElementById("exp-" + key).classList.add("show");
+        if (qBlock.dataset.locked) return;
+        qBlock.dataset.locked = "1";
+        inp.style.borderColor = ok ? "var(--pos)" : "var(--red)";
+        inp.style.background = ok ? "#e6f2ea" : "#fbeee9";
+        bumpScore(pid, key, ok);
+      }
+      function bumpScore(pid, key, correct) {
+        if (state.quizAnswered.has(key)) return;
+        state.quizAnswered.add(key);
+        state.quizMax++;
+        if (correct) {
+          state.quizScore++;
+        }
+        // per-quiz score
+        const p = PROGRAMS.find((x) => x.id === pid);
+        const answered = [...state.quizAnswered].filter((k) =>
+          k.startsWith(pid + "-"),
+        );
+        const got = answered.filter((k) => {
+          // recount correct for this quiz
+          return quizCorrect.has(k);
+        });
+        if (correct) quizCorrect.add(key);
+        const nCorrect = [...quizCorrect].filter((k) =>
+          k.startsWith(pid + "-"),
+        ).length;
+        document.querySelector("#quiz-" + pid + " [data-qscore]").textContent =
+          `${nCorrect} / ${p.quiz.length}`;
+        document.getElementById("qcount").textContent = state.quizScore;
+      }
+      const quizCorrect = new Set();
+
+      /* ---------- activation / progress ---------- */
+      function activate(idx) {
+        state.active = idx;
+        document
+          .querySelectorAll(".tab")
+          .forEach((t) => t.classList.toggle("active", +t.dataset.idx === idx));
+        document
+          .querySelectorAll(".panel")
+          .forEach((pn) =>
+            pn.classList.toggle("show", +pn.dataset.idx === idx),
+          );
+        const id = PROGRAMS[idx].id;
+        memInit(id);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      function markDone(idx) {
+        state.done.add(idx);
+        const p = PROGRAMS[idx];
+        document.querySelector(`[data-done="${p.id}"]`).style.display =
+          "inline";
+        const btn = document.querySelector(`[data-mark="${idx}"]`);
+        btn.classList.add("marked");
+        btn.textContent = `Program ${idx + 1} complete ✓`;
+        updateProgress();
+        // auto-advance
+        if (idx < PROGRAMS.length - 1) setTimeout(() => activate(idx + 1), 450);
+      }
+      function updateProgress() {
+        const pct = Math.round((state.done.size / PROGRAMS.length) * 100);
+        document.getElementById("globalprog").style.width = pct + "%";
+        document.getElementById("progpct").textContent = pct + "%";
+      }
+
+      function escapeHTML(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      /* ---------- boot ---------- */
+      activate(0);
+    </script>
+  </body>
+</html>
