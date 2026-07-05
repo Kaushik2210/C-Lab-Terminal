@@ -4,6 +4,8 @@
 
 
 **Deployed Link:https://c-lab-terminal-v-1.vercel.app/**
+
+
 Every program from the lab manual, dismantled and rebuilt: syntax you can poke, code you reveal line by line, memory you watch change, and quizzes that actually score you. Built around the manual's own Smart Retail & Inventory Management domain, with a point-of-sale receipt aesthetic.
 
 It's a single, self-contained HTML file. No build step, no dependencies, no internet required.
