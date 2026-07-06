@@ -3723,11 +3723,1583 @@ PRACTICE_U2.push(
  ]
 }
 );
+/* ===== PRACTICE QUESTIONS — UNIT 3 (Q51–63) ===== */
+const PRACTICE_U3 = [
+{
+ id:"pq51", unit:"Unit 3", tab:"Q51 · Rotate array",
+ title:"Rotate an array right by k using reversal",
+ question:"Rotate an array right by k positions in O(n) time, no extra array. Prove correctness; handle k>n.",
+ aim:"Use the classic 'reverse three times' trick to rotate in place with zero extra storage.",
+ file:"q51.c",
+ syntax:[
+  {tok:"reverse(arr, start, end)", why:"In-place two-pointer swap",
+   body:"Swaps elements from both ends inward until the pointers meet — the building block the whole rotation is made of.",
+   trap:"Off-by-one on start/end bounds is the most common bug in any two-pointer reversal."},
+  {tok:"reverse whole, then reverse parts", why:"The 'reverse three times' trick",
+   body:"Reversing the WHOLE array, then reversing the first k and the remaining n-k separately, produces exactly a right-rotation by k. It's a clever composition of three simple reversals.",
+   trap:"Doing the part-reversals BEFORE the whole-array reversal gives a completely different (wrong) result — order matters."},
+  {tok:"k %= n", why:"Handle k > n gracefully",
+   body:"Rotating by n positions returns to the original array, so any k larger than n is equivalent to <code>k mod n</code>.",
+   trap:"Skipping this normalization means a large k could index out of bounds or just do redundant full rotations."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">reverse</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> start,<span class="ty">int</span> end){'},
+  {t:'  <span class="kw">while</span>(start&lt;end){ <span class="ty">int</span> t=arr[start]; arr[start]=arr[end]; arr[end]=t; start++; end--; }',note:"Classic two-pointer in-place swap.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">rotateRight</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n,<span class="ty">int</span> k){'},
+  {t:'  k%=n; <span class="kw">if</span>(k&lt;<span class="num">0</span>) k+=n;',note:"Normalize k to a safe range, even for negative input.",hl:true},
+  {t:'  <span class="fn">reverse</span>(arr,<span class="num">0</span>,n-<span class="num">1</span>);',note:"Step 1: reverse the WHOLE array.",hl:true},
+  {t:'  <span class="fn">reverse</span>(arr,<span class="num">0</span>,k-<span class="num">1</span>);',note:"Step 2: reverse just the first k elements back.",hl:true},
+  {t:'  <span class="fn">reverse</span>(arr,k,n-<span class="num">1</span>);',note:"Step 3: reverse the remaining n-k elements back.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Rotating [1,2,3,4,5,6,7] right by 3",
+  vars:["array","step"],
+  steps:[
+   {desc:"Original: [1,2,3,4,5,6,7]",set:{array:"1,2,3,4,5,6,7",step:"start"},chg:["array","step"]},
+   {desc:"Step 1 — reverse whole array: [7,6,5,4,3,2,1]",set:{array:"7,6,5,4,3,2,1",step:"reversed whole"},chg:["array","step"]},
+   {desc:"Step 2 — reverse first k=3: [5,6,7,4,3,2,1]",set:{array:"5,6,7,4,3,2,1",step:"reversed first 3"},chg:["array","step"]},
+   {desc:"Step 3 — reverse remaining 4: [5,6,7,1,2,3,4] — <span class='exec'>rotated!</span>",set:{array:"5,6,7,1,2,3,4",step:"done"},chg:["array","step"]}
+  ]
+ },
+ output:[
+  {o:"Original: 1 2 3 4 5 6 7"},
+  {o:"Rotated right by 3: 5 6 7 1 2 3 4"},
+  {o:"Rotate [1,2,3] by 5 (k>n, k%n=2): 2 3 1"}
+ ],
+ better:{
+  naive:"A naive rotation shifts elements one at a time, k times — O(n×k), much slower than the O(n) reversal trick.",
+  improvements:[
+   "<b>The reversal technique</b> (used here) is optimal: O(n) time, O(1) space, regardless of k's size relative to n.",
+   "<b>Normalize k first</b> — always reduce modulo n before doing any work, handling negative or oversized k uniformly.",
+   "<b>For left-rotation</b>, the same trick works with the reversal order/ranges adjusted — worth deriving as a follow-up exercise."
+  ],
+  complexity:["Time: O(n) — each element touched a constant number of times","Space: O(1) — no auxiliary array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Rotating [1,2,3,4,5] right by 2 gives?",
+   opts:["[3,4,5,1,2]","[4,5,1,2,3]","[2,3,4,5,1]","[1,2,3,4,5]"],ans:1,
+   exp:"<b>[4,5,1,2,3].</b> The last 2 elements (4,5) move to the front, and the rest shift right by 2."},
+  {type:"spot-the-bug",q:"What happens if you reverse the first k and last n-k BEFORE reversing the whole array?",
+   opts:["Same result","A completely different, incorrect rotation","Compile error","Faster"],ans:1,
+   exp:"<b>Wrong result.</b> The order of the three reversals is essential — reversing parts first then the whole undoes the wrong things and produces a different permutation."},
+  {type:"fill-in-the-blank",q:"For k larger than n, the effective rotation amount is <code>k ____ n</code>.",
+   answer:"%",exp:"k % n reduces any oversized or negative rotation to its equivalent value within [0,n)."}
+ ]
+},
+{
+ id:"pq52", unit:"Unit 3", tab:"Q52 · Merge sorted arrays",
+ title:"Merging two sorted arrays, then in-place",
+ question:"Merge two sorted arrays of size m,n without built-in sort; then do it in-place with O(1) extra space.",
+ aim:"Two-pointer merge for a new array, then a from-the-back merge trick for the in-place version.",
+ file:"q52.c",
+ syntax:[
+  {tok:"two-pointer merge", why:"Classic O(m+n) merge",
+   body:"Compare the current fronts of both arrays, take the smaller, advance that pointer. Repeat until one array is exhausted, then append the rest of the other.",
+   trap:"Forgetting the two 'drain the rest' loops after the main loop misses any leftover elements in the longer array."},
+  {tok:"merge from the back (in-place)", why:"O(1) extra space trick",
+   body:"If array A has extra trailing space for B's elements, filling from the BACK (largest values first) avoids overwriting values you haven't compared yet.",
+   trap:"Merging from the FRONT in-place would overwrite A's own unprocessed elements — the back-to-front direction is what makes it safe."},
+  {tok:"three pointers i,j,k", why:"Track both sources and the destination",
+   body:"i tracks A's remaining elements, j tracks B's, k tracks where the next (largest remaining) value goes — all moving backward together.",
+   trap:"Not decrementing k to exactly aLen+bLen-1 at the start misaligns the whole merge."}
+ ],
+ code:[
+  {t:'<span class="cm">// New-array merge</span>'},
+  {t:'<span class="kw">while</span>(i&lt;m &amp;&amp; j&lt;n) out[k++] = (a[i]&lt;=b[j]) ? a[i++] : b[j++];',note:"Take the smaller front element each time.",hl:true},
+  {t:'<span class="kw">while</span>(i&lt;m) out[k++]=a[i++]; <span class="cm">// drain leftovers</span>',note:"Don't forget the leftover elements!"},
+  {t:'<span class="kw">while</span>(j&lt;n) out[k++]=b[j++];'},
+  {t:'<span class="cm">// In-place merge: A has trailing space, fill from the BACK</span>',hl:true},
+  {t:'<span class="ty">int</span> i=aLen-<span class="num">1</span>, j=bLen-<span class="num">1</span>, k=aLen+bLen-<span class="num">1</span>;'},
+  {t:'<span class="kw">while</span>(j&gt;=<span class="num">0</span>){'},
+  {t:'  <span class="kw">if</span>(i&gt;=<span class="num">0</span> &amp;&amp; A[i]&gt;B[j]) A[k--]=A[i--];',note:"Place the larger of the two remaining fronts at the back.",hl:true},
+  {t:'  <span class="kw">else</span> A[k--]=B[j--];'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"In-place merging A=[1,3,5,7,_,_,_,_,_], B=[2,4,6,8,10]",
+  vars:["i","j","k","A[k]"],
+  steps:[
+   {desc:"i=3(A[3]=7), j=4(B[4]=10), k=8. B[4]=10 > A[3]=7 → A[8]=10",set:{i:"3",j:"4",k:"8","A[k]":"10"},chg:["i","j","k","A[k]"]},
+   {desc:"j=3(B[3]=8), k=7. 8 > 7 → A[7]=8",set:{j:"3",k:"7","A[k]":"8"},chg:["j","k","A[k]"]},
+   {desc:"j=2(B[2]=6), k=6. 7 > 6 → A[6]=7, i=2",set:{i:"2",k:"6","A[k]":"7"},chg:["i","k","A[k]"]},
+   {desc:"...continues until j<0. Final: <span class='exec'>[1,2,3,4,5,6,7,8,10]</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Merged (new array): 1 2 3 4 5 6 7 8 10"},
+  {o:"Merged in-place: 1 2 3 4 5 6 7 8 10"}
+ ],
+ better:{
+  naive:"The new-array version is simple but uses O(m+n) extra space — fine usually, but wasteful when A already has room to spare.",
+  improvements:[
+   "<b>The back-to-front in-place merge</b> (shown here) achieves the same result with zero extra space when A has trailing capacity.",
+   "<b>Both are already optimal in time</b>: O(m+n), since every element is examined once.",
+   "<b>This exact technique</b> is the core of LeetCode's 'Merge Sorted Array' problem — a very practical, interview-relevant pattern."
+  ],
+  complexity:["Time: O(m+n) both versions","New-array space: O(m+n)","In-place space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why must the in-place merge fill from the BACK, not the front?",
+   opts:["Style preference","Filling from front would overwrite A's own unprocessed elements","Faster","Required by C"],ans:1,
+   exp:"<b>Avoids overwriting.</b> A's trailing slots are empty, but its front holds real data you still need to compare — filling from the back never touches those until they've been read."},
+  {type:"spot-the-bug",q:"What's missing if you only write the main two-pointer loop and skip the 'drain leftovers' loops?",
+   opts:["Nothing","Elements remaining in the longer array never get copied","Extra elements get duplicated","Compile error"],ans:1,
+   exp:"<b>Leftover elements lost.</b> Once one array is exhausted, the main loop stops — you must explicitly copy whatever remains in the other array."},
+  {type:"fill-in-the-blank",q:"The new-array merge algorithm runs in O(____) time, where m and n are the two array sizes.",
+   answer:"m+n",exp:"Every element from both arrays is visited exactly once — linear in their combined size."}
+ ]
+},
+{
+ id:"pq53", unit:"Unit 3", tab:"Q53 · Bubble vs Selection",
+ title:"Instrumenting bubble sort vs selection sort",
+ question:"Count comparisons and swaps for both algorithms on sorted, reverse-sorted, and random data.",
+ aim:"See how each algorithm's swap count (not comparison count) reveals its real behavioural difference.",
+ file:"q53.c",
+ syntax:[
+  {tok:"pointer counters (long*)", why:"Accumulate stats across calls",
+   body:"Passing <code>&comparisons</code> and <code>&swaps</code> lets the sort function increment the caller's counters directly — a simple instrumentation pattern.",
+   trap:"Forgetting to reset counters to 0 before reusing them across multiple test runs corrupts the comparison."},
+  {tok:"bubble: swaps on every inversion", why:"Swaps scale with disorder",
+   body:"Bubble sort swaps every time it finds adjacent elements out of order — on reverse-sorted data, that's the maximum possible swap count.",
+   trap:"Assuming bubble and selection sort behave the same just because comparisons match — their SWAP counts diverge sharply."},
+  {tok:"selection: at most one swap per pass", why:"Swaps are bounded by n, not disorder",
+   body:"Selection sort scans to find the minimum, then does AT MOST one swap per outer iteration — regardless of how disordered the data is.",
+   trap:"This is why selection sort can beat bubble sort when swaps are expensive (e.g. large records), even though comparison counts are similar."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">bubbleSort</span>(<span class="ty">int</span> arr[], <span class="ty">int</span> n, <span class="ty">long</span> *comparisons, <span class="ty">long</span> *swaps){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n-<span class="num">1</span>;i++)'},
+  {t:'    <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;n-<span class="num">1</span>-i;j++){'},
+  {t:'      (*comparisons)++;'},
+  {t:'      <span class="kw">if</span>(arr[j]&gt;arr[j+<span class="num">1</span>]){ ... (*swaps)++; }',note:"Swaps EVERY adjacent inversion found.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">selectionSort</span>(<span class="ty">int</span> arr[], <span class="ty">int</span> n, <span class="ty">long</span> *comparisons, <span class="ty">long</span> *swaps){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n-<span class="num">1</span>;i++){'},
+  {t:'    <span class="ty">int</span> minIdx=i;'},
+  {t:'    <span class="kw">for</span>(<span class="ty">int</span> j=i+<span class="num">1</span>;j&lt;n;j++){ (*comparisons)++; <span class="kw">if</span>(arr[j]&lt;arr[minIdx]) minIdx=j; }'},
+  {t:'    <span class="kw">if</span>(minIdx!=i){ ... (*swaps)++; }',note:"AT MOST one swap per outer iteration, no matter how disordered.",hl:true},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Reverse-sorted [5,4,3,2,1], n=5",
+  vars:["bubble swaps","selection swaps"],
+  steps:[
+   {desc:"Bubble sort on reverse data: every adjacent pair is inverted, every comparison triggers a swap",set:{"bubble swaps":"10 (worst case)"},chg:["bubble swaps"]},
+   {desc:"Selection sort: only 1 swap per outer pass (moving the found minimum into place)",set:{"selection swaps":"2 (n/2 max)"},chg:["selection swaps"]},
+   {desc:"Same comparisons (10 both), but <span class='exec'>vastly different swap counts</span> on this worst-case input",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Sorted: bubble(cmp=10,swap=0) selection(cmp=10,swap=0)"},
+  {o:"Reverse-sorted: bubble(cmp=10,swap=10) selection(cmp=10,swap=2)"},
+  {o:"Random: bubble(cmp=10,swap=3) selection(cmp=10,swap=3)"}
+ ],
+ better:{
+  naive:"Neither algorithm is O(n log n) — both are O(n²) in the worst case, unsuitable for large datasets regardless of swap counts.",
+  improvements:[
+   "<b>Use the swap-count insight practically</b>: prefer selection sort when swaps are expensive (large structs) even if total comparisons are similar.",
+   "<b>For real production sorting</b>, use <code>qsort</code> (O(n log n)) — both these algorithms are for teaching, not production scale.",
+   "<b>Add an early-exit flag to bubble sort</b> — if a full pass makes zero swaps, the array is already sorted and you can stop early."
+  ],
+  complexity:["Both: O(n²) time worst case","Bubble sort swaps: up to O(n²)","Selection sort swaps: always O(n)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"On reverse-sorted data, which algorithm does FEWER swaps?",
+   opts:["Bubble sort","Selection sort","Identical","Depends on n"],ans:1,
+   exp:"<b>Selection sort.</b> It does at most one swap per outer pass (n-1 total max), while bubble sort swaps on every inversion it encounters — far more on reverse-sorted data."},
+  {type:"spot-the-bug",q:"Why do both algorithms have similar comparison counts here?",
+   opts:["Coincidence","Both use nested loops covering the same n(n-1)/2 pairs of positions","Bug in the code","They don't"],ans:1,
+   exp:"<b>Same structure.</b> Both algorithms fundamentally compare each pair of positions in a triangular pattern, giving similar total comparison counts even though their SWAP behavior differs sharply."},
+  {type:"fill-in-the-blank",q:"Selection sort performs at most ____ swap(s) per outer loop iteration.",
+   answer:"one",exp:"It finds the minimum first, then does a single swap (if needed) to place it — never more than one per pass."}
+ ]
+},
+{
+ id:"pq54", unit:"Unit 3", tab:"Q54 · Sparse matrix",
+ title:"Sparse matrix representation and addition",
+ question:"Design a sparse matrix using 1D storage instead of 2D; implement addition of two sparse matrices.",
+ aim:"Store only non-zero (row,col,value) triples and merge two such lists when adding.",
+ file:"q54.c",
+ syntax:[
+  {tok:"struct Triple {row,col,val}", why:"Store only what's non-zero",
+   body:"Instead of a full 2D grid (mostly zeros), store one triple per non-zero entry — dramatically less memory for sparse data.",
+   trap:"For a DENSE matrix (few zeros), this representation actually uses MORE memory than a plain 2D array — sparsity is the whole justification."},
+  {tok:"merge-by-matching (row,col)", why:"Addition means combining matching positions",
+   body:"For each entry in A, search B for a matching (row,col); if found, sum the values and mark B's entry as used. Any of B's entries left unmatched get added as-is.",
+   trap:"Forgetting to track 'used' entries in B causes them to be added twice (once via the match, once as an unmatched leftover)."},
+  {tok:"result set includes leftovers", why:"Positions unique to either matrix survive",
+   body:"A position that's non-zero in only one of the two matrices still appears in the sum with its original value.",
+   trap:"Only outputting matched pairs would silently drop non-zero entries that don't overlap between A and B."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">int</span> row,col,val; } Triple;',note:"Only non-zero cells get stored — one struct per entry.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;an;i++){'},
+  {t:'  <span class="ty">int</span> sum=A[i].val;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;bn;j++)'},
+  {t:'    <span class="kw">if</span>(B[j].row==A[i].row &amp;&amp; B[j].col==A[i].col){ sum+=B[j].val; used[j]=<span class="num">1</span>; }',note:"Find B's matching position, sum values, mark used.",hl:true},
+  {t:'  result[rn++]=(Triple){A[i].row,A[i].col,sum};'},
+  {t:'}'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;bn;j++) <span class="kw">if</span>(!used[j]) result[rn++]=B[j];',note:"B's unmatched (unique) entries carry over unchanged.",hl:true}
+ ],
+ mem:{
+  title:"Adding sparse A and B (4×4 matrices)",
+  vars:["A entry","B entry","matched?","result"],
+  steps:[
+   {desc:"A[0]=(0,0,5). Search B for (0,0): found B[0]=(0,0,2).",set:{"A entry":"(0,0,5)","B entry":"(0,0,2)","matched?":"yes"},chg:["A entry","B entry","matched?"]},
+   {desc:"Sum = 5+2 = 7. result gets (0,0,7)",set:{result:"(0,0,7)"},chg:["result"]},
+   {desc:"A[1]=(1,2,8) matches B[1]=(1,2,1) → sum=9. A[2]=(3,3,3), no match in B → stays 3.",set:{},chg:[]},
+   {desc:"B[2]=(2,1,4) never matched by any A entry → <span class='exec'>carried over as-is</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Sparse sum (row,col,val):"},
+  {o:"(0,0,7) (1,2,9) (3,3,3) (2,1,4)"},
+  {o:"Storing only 4 nonzero entries instead of 16 cells (4x4)."}
+ ],
+ better:{
+  naive:"The nested-loop matching (O(an×bn)) is fine for small sparse matrices but scales poorly if either has many non-zero entries.",
+  improvements:[
+   "<b>Sort both triple lists by (row,col)</b> first, then merge in O(an+bn) like the merge-sorted-arrays technique — much faster for large sparse matrices.",
+   "<b>Use a hash map keyed by (row,col)</b> for O(1) average lookup instead of a linear scan through B.",
+   "<b>Validate matrix dimensions match</b> before attempting addition — adding matrices of different sizes should be an explicit error."
+  ],
+  complexity:["Naive matching: O(an × bn)","Sorted-merge alternative: O(an log an + bn log bn) to sort, O(an+bn) to merge","Space: O(nonzero entries), not O(rows×cols)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For a 1000×1000 matrix with only 50 non-zero entries, which storage uses less memory?",
+   opts:["Full 2D array","Sparse triple list","Same either way","Depends on values"],ans:1,
+   exp:"<b>Sparse triple list.</b> Storing 50 triples is vastly cheaper than a million-cell 2D array, which is the entire point of sparse representations."},
+  {type:"spot-the-bug",q:"Why mark B's entries as 'used' during the matching process?",
+   opts:["Unnecessary","Prevents adding the same B entry twice — once via match, once as a leftover","Speeds up the algorithm","Required syntax"],ans:1,
+   exp:"<b>Avoid duplication.</b> Without the used-flag, a matched B entry would ALSO get added again in the 'unmatched leftovers' pass, double-counting it."},
+  {type:"fill-in-the-blank",q:"A sparse matrix representation is justified when the matrix has a high proportion of ____ values.",
+   answer:"zero",exp:"Sparse (mostly-zero) matrices benefit hugely from storing only the non-zero entries."}
+ ]
+},
+{
+ id:"pq55", unit:"Unit 3", tab:"Q55 · Pangram check",
+ title:"Pangram detection without string library",
+ question:"Check if a string contains every letter of the alphabet at least once, using arrays as frequency tables.",
+ aim:"Mark a 26-element boolean array as each letter appears, then confirm all 26 got marked.",
+ file:"q55.c",
+ syntax:[
+  {tok:"seen[26] boolean array", why:"One slot per letter",
+   body:"<code>seen[c-'a']</code> maps each lowercase letter to an index 0-25, marking it present without needing any string library function.",
+   trap:"Not handling both upper and lower case means a pangram written with capitals would be missed."},
+  {tok:"case-insensitive marking", why:"Handle both cases",
+   body:"Checking both <code>'a'..'z'</code> and <code>'A'..'Z'</code> ranges (mapping to the same 0-25 index) ensures 'A' and 'a' both mark the same slot.",
+   trap:"Forgetting one case branch silently drops those letters from ever being marked."},
+  {tok:"single-pass verification", why:"Check all 26 marked",
+   body:"After scanning the whole string once, a simple loop over the 26-slot array checks if every single one got marked — that's the pangram test.",
+   trap:"Checking mid-scan (before the string is fully processed) could report a false negative."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> seen[<span class="num">26</span>]={<span class="num">0</span>};',note:"One flag per letter of the alphabet.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;s[i];i++){'},
+  {t:'  <span class="ty">char</span> c=s[i];'},
+  {t:'  <span class="kw">if</span>(c&gt;=<span class="str">\'a\'</span>&amp;&amp;c&lt;=<span class="str">\'z\'</span>) seen[c-<span class="str">\'a\'</span>]=<span class="num">1</span>;',note:"Lowercase → index 0-25.",hl:true},
+  {t:'  <span class="kw">else if</span>(c&gt;=<span class="str">\'A\'</span>&amp;&amp;c&lt;=<span class="str">\'Z\'</span>) seen[c-<span class="str">\'A\'</span>]=<span class="num">1</span>;',note:"Uppercase → SAME index range.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> isPangram=<span class="num">1</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">26</span>;i++) <span class="kw">if</span>(!seen[i]){ isPangram=<span class="num">0</span>; <span class="kw">break</span>; }',note:"All 26 must be marked.",hl:true}
+ ],
+ mem:{
+  title:"Scanning \"The quick brown fox...\"",
+  vars:["char","index","seen[]"],
+  steps:[
+   {desc:"'T' (upper) → index 19 ('T'-'A'). seen[19]=1",set:{"char":"T",index:"19"},chg:["char","index"]},
+   {desc:"'h' (lower) → index 7. seen[7]=1",set:{"char":"h",index:"7"},chg:["char","index"]},
+   {desc:"...continues through the whole string, marking every letter encountered",set:{},chg:[]},
+   {desc:"Final check: all 26 slots marked → <span class='exec'>IS a pangram</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"\"The quick brown fox jumps over the lazy dog\""},
+  {o:"Is pangram? Yes"}
+ ],
+ better:{
+  naive:"Works fine, but the if/else-if branch for upper/lower could be unified using tolower() from ctype.h for cleaner code (at the cost of using a library function).",
+  improvements:[
+   "<b>Bitmask instead of array</b>: a single 32-bit integer with one bit per letter can replace the whole 26-element array, saving memory.",
+   "<b>Early exit</b>: track a running count of unique letters seen and break out the moment it hits 26, rather than scanning to the string's end.",
+   "<b>Extend to check 'perfect pangram'</b> (each letter appears EXACTLY once) by counting occurrences instead of just a boolean flag."
+  ],
+  complexity:["Time: O(n) in string length, plus O(26) for the final check","Space: O(26) = O(1) — fixed size regardless of input"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is \"Hello World\" a pangram?",
+   opts:["Yes","No — missing many letters","Only if lowercase","Undefined"],ans:1,
+   exp:"<b>No.</b> \"Hello World\" uses only a handful of distinct letters — nowhere near covering all 26."},
+  {type:"spot-the-bug",q:"What happens if the code only checks lowercase 'a'-'z' and the input has capital letters?",
+   opts:["No effect","Capital letters never get marked, potentially causing false negatives","Compile error","Crashes"],ans:1,
+   exp:"<b>Missed letters.</b> A pangram sentence with capitalized words (like \"The quick...\") would fail to mark those letters without the uppercase branch too."},
+  {type:"fill-in-the-blank",q:"A lowercase letter c maps to array index <code>c - '____'</code>.",
+   answer:"a",exp:"Subtracting the ASCII value of 'a' converts any lowercase letter to a 0-25 index."}
+ ]
+},
+{
+ id:"pq56", unit:"Unit 3", tab:"Q56 · Binary search bounds",
+ title:"Binary search: first and last occurrence",
+ question:"Implement binary search; extend to find first and last occurrence of a repeated element.",
+ aim:"Modify standard binary search to keep narrowing even after finding a match, biasing toward one edge.",
+ file:"q56.c",
+ syntax:[
+  {tok:"standard binary search core", why:"Halve the search space",
+   body:"Compare the middle element; if it matches, you'd normally stop — but here we remember it and keep searching one direction for more matches.",
+   trap:"Stopping immediately on the first match found doesn't guarantee it's the FIRST or LAST occurrence."},
+  {tok:"find-first: hi=mid-1 on match", why:"Keep searching LEFT after a match",
+   body:"When you find the target, record the index but continue searching the LEFT half (hi=mid-1) in case an earlier occurrence exists.",
+   trap:"Setting lo=mid+1 instead would search right, finding the LAST occurrence instead of first — same core loop, opposite bias."},
+  {tok:"find-last: lo=mid+1 on match", why:"Keep searching RIGHT after a match",
+   body:"Mirror logic: after finding a match, keep searching the right half for a possibly later occurrence.",
+   trap:"Mixing up the two functions' post-match direction is the single most common bug when implementing this pair."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">firstOcc</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n,<span class="ty">int</span> target){'},
+  {t:'  <span class="ty">int</span> lo=<span class="num">0</span>,hi=n-<span class="num">1</span>,res=-<span class="num">1</span>;'},
+  {t:'  <span class="kw">while</span>(lo&lt;=hi){ <span class="ty">int</span> mid=(lo+hi)/<span class="num">2</span>;'},
+  {t:'    <span class="kw">if</span>(arr[mid]==target){ res=mid; hi=mid-<span class="num">1</span>; }',note:"Record match, then search LEFT for an earlier one.",hl:true},
+  {t:'    <span class="kw">else if</span>(arr[mid]&lt;target) lo=mid+<span class="num">1</span>; <span class="kw">else</span> hi=mid-<span class="num">1</span>;'},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> res;'},
+  {t:'}'},
+  {t:'<span class="cm">// lastOcc is IDENTICAL except: if match, lo=mid+1 (search RIGHT instead)</span>',hl:true}
+ ],
+ mem:{
+  title:"Finding first/last of 2 in [1,2,2,2,2,2,3,4]",
+  vars:["lo","hi","mid","res"],
+  steps:[
+   {desc:"firstOcc: lo=0,hi=7. mid=3, arr[3]=2==target → res=3, search left: hi=2",set:{lo:"0",hi:"2","mid":"3",res:"3"},chg:["lo","hi","mid","res"]},
+   {desc:"lo=0,hi=2. mid=1, arr[1]=2==target → res=1, hi=0",set:{hi:"0","mid":"1",res:"1"},chg:["hi","mid","res"]},
+   {desc:"lo=0,hi=0. mid=0, arr[0]=1≠2 → lo=1. Now lo>hi, loop ends. <span class='exec'>First occurrence = index 1</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"First occurrence of 2: 1"},
+  {o:"Last occurrence of 2: 5"},
+  {o:"All-identical array: first=0 last=3"}
+ ],
+ better:{
+  naive:"A linear scan would also find first/last occurrence, but in O(n) instead of O(log n) — binary search is strictly better for sorted data.",
+  improvements:[
+   "<b>The bias-after-match technique</b> (shown here) is the standard, optimal approach — O(log n) for both first and last.",
+   "<b>Combine into one call</b> that returns both indices, or even the full count (last-first+1), avoiding two separate searches if both are needed.",
+   "<b>Handle 'not found'</b> explicitly — res stays -1 if the target never appears, which callers must check."
+  ],
+  complexity:["Time: O(log n) for each of first/last","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"In an array of 5 identical values, what do firstOcc and lastOcc return?",
+   opts:["Both -1","first=0, last=n-1","first=n-1, last=0","Both return the same middle index"],ans:1,
+   exp:"<b>first=0, last=n-1.</b> Since every element matches, the search keeps narrowing all the way to each respective boundary."},
+  {type:"spot-the-bug",q:"What's the ONE line that differs between firstOcc and lastOcc?",
+   opts:["The whole function is different","On a match: hi=mid-1 (first) vs lo=mid+1 (last)","The while condition","The return statement"],ans:1,
+   exp:"<b>Post-match direction.</b> Everything else is identical; only the direction you keep searching after finding a match differs between first and last."},
+  {type:"fill-in-the-blank",q:"Binary search on a sorted array of n elements runs in O(____) time.",
+   answer:"log n",exp:"Each comparison halves the remaining search space, giving logarithmic time complexity."}
+ ]
+},
+{
+ id:"pq57", unit:"Unit 3", tab:"Q57 · Game of Life",
+ title:"Conway's Game of Life, one generation in-place",
+ question:"Implement one generation step of Game of Life without a second array.",
+ aim:"Encode the next state in an unused bit of each cell, then shift all cells over in a second pass.",
+ file:"q57.c",
+ syntax:[
+  {tok:"bit 0 = current, bit 1 = next", why:"Two states per cell, one integer",
+   body:"Using bit 0 for the CURRENT state and bit 1 for the NEXT state lets one array hold both generations simultaneously without a second grid.",
+   trap:"Reading a neighbor's state must mask with <code>&1</code> to get its CURRENT state, ignoring any next-state bit already written to it."},
+  {tok:"countNeighbors masks &1", why:"Only count current-generation neighbors",
+   body:"While computing next states, some neighbors might already have their bit-1 set from earlier in the same pass — masking with <code>&1</code> ensures you're only reading their ORIGINAL state.",
+   trap:"Forgetting the mask would let already-updated neighbors leak next-generation information into the current computation — corrupting the simulation."},
+  {tok:"second pass: shift right", why:"Promote next state to current",
+   body:"After all cells have their next-state bit computed, a final pass shifts bit 1 into bit 0 for every cell, completing the generation transition.",
+   trap:"Shifting during the FIRST pass (before all cells are processed) would let later cells read already-advanced neighbors — need two clearly separated passes."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">countNeighbors</span>(<span class="ty">int</span> g[N][N],<span class="ty">int</span> r,<span class="ty">int</span> c){'},
+  {t:'  ... cnt += (g[nr][nc]&amp;<span class="num">1</span>);',note:"Mask with &1 to read ONLY the current-generation bit, ignoring any next-state bit already set.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Pass 1: compute next state, store in bit 1 (value 2)</span>',hl:true},
+  {t:'<span class="kw">for</span>(...){'},
+  {t:'  <span class="ty">int</span> n=<span class="fn">countNeighbors</span>(g,i,j);'},
+  {t:'  <span class="ty">int</span> alive=g[i][j]&amp;<span class="num">1</span>;'},
+  {t:'  <span class="ty">int</span> next = (alive &amp;&amp; (n==<span class="num">2</span>||n==<span class="num">3</span>)) || (!alive &amp;&amp; n==<span class="num">3</span>);',note:"Conway's rules: survive on 2-3 neighbors, birth on exactly 3."},
+  {t:'  <span class="kw">if</span>(next) g[i][j] |= <span class="num">2</span>;',note:"Store next-state in bit 1 — bit 0 (current) untouched for now.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Pass 2: shift bit 1 down into bit 0 for all cells</span>',hl:true},
+  {t:'<span class="kw">for</span>(...) g[i][j] = (g[i][j]&gt;&gt;<span class="num">1</span>)&amp;<span class="num">1</span>;',note:"Promote next-state to current-state, cleanly, in one pass."}
+ ],
+ mem:{
+  title:"A vertical blinker rotating to horizontal",
+  vars:["cell","bit0 (current)","bit1 (next)"],
+  steps:[
+   {desc:"Vertical blinker: column 1 has 3 live cells (rows 0,1,2)",set:{cell:"[0][1],[1][1],[2][1]","bit0 (current)":"1,1,1"},chg:["cell","bit0 (current)"]},
+   {desc:"Cell [1][0] (dead, left of middle): 3 neighbors alive → birth! bit1 set to 1",set:{cell:"[1][0]","bit1 (next)":"1 (birth)"},chg:["cell","bit1 (next)"]},
+   {desc:"Cell [0][1] (alive, top): only 1 neighbor (middle) → dies. bit1 stays 0",set:{cell:"[0][1]","bit1 (next)":"0 (dies)"},chg:["cell","bit1 (next)"]},
+   {desc:"Pass 2 shifts all bit1→bit0: <span class='exec'>blinker rotates from vertical to horizontal</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Before:"},{o:"0 1 0 0"},{o:"0 1 0 0"},{o:"0 1 0 0"},{o:"0 0 0 0"},
+  {o:"After:"},{o:"0 0 0 0"},{o:"1 1 1 0"},{o:"0 0 0 0"},{o:"0 0 0 0"}
+ ],
+ better:{
+  naive:"A second full array is the obvious approach and perfectly valid — the bit-packing trick is specifically for when you must avoid that extra O(n²) allocation.",
+  improvements:[
+   "<b>The 2-bit encoding</b> (shown here) achieves true in-place update with zero extra array — useful in memory-constrained contexts.",
+   "<b>For clarity over cleverness</b>, a second array is often the better real-world choice unless memory is genuinely tight — this technique trades readability for space savings.",
+   "<b>Handle grid edges</b> carefully — cells on the border have fewer than 8 neighbors, which the bounds-check in countNeighbors already handles correctly."
+  ],
+  complexity:["Time: O(rows×cols×8) — each cell checks 8 neighbors","Space: O(1) extra — reuses the same array via bit-packing"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why mask with &1 when counting neighbors, instead of just checking if the value is non-zero?",
+   opts:["No reason","A neighbor might already have its NEXT-state bit set, which must be ignored","Faster","Required syntax"],ans:1,
+   exp:"<b>Isolate current state.</b> During the pass, some already-processed neighbors have bit 1 set (their next state) — masking with &1 ensures you read only their original, current-generation state."},
+  {type:"spot-the-bug",q:"What would go wrong if you shifted bit1→bit0 for a cell immediately after computing it, instead of in a separate second pass?",
+   opts:["Nothing","Cells processed later would read already-advanced (next-gen) neighbors instead of current-gen ones","Faster","Compile error"],ans:1,
+   exp:"<b>Contaminated generation.</b> Game of Life requires ALL cells to update based on the SAME starting generation — updating and reading in the same pass would mix generations."},
+  {type:"fill-in-the-blank",q:"A cell with exactly ____ live neighbors is born (if currently dead) in Conway's Game of Life.",
+   answer:"3",exp:"The birth rule: a dead cell with exactly 3 live neighbors becomes alive next generation."}
+ ]
+},
+{
+ id:"pq58", unit:"Unit 3", tab:"Q58 · Reverse words",
+ title:"Reverse a sentence word by word",
+ question:"Reverse 'Hello World' to 'World Hello' — word order, not character order — without string library functions.",
+ aim:"Split on spaces into a 2D word buffer, then print that buffer back in reverse order.",
+ file:"q58.c",
+ syntax:[
+  {tok:"char words[MAXW][30]", why:"A 2D array of word buffers",
+   body:"Each row holds one word (up to 29 chars + null terminator). Splitting on spaces fills rows sequentially as words are found.",
+   trap:"Undersizing the row width truncates any word longer than the buffer, silently corrupting output."},
+  {tok:"split on space OR end-of-string", why:"Two conditions end a word",
+   body:"A word ends either at a space (more words follow) or at the null terminator (last word, then stop). Both cases need to close out the current word buffer.",
+   trap:"Handling only the space case misses the final word if the string doesn't end with a space."},
+  {tok:"print in reverse index order", why:"Reassemble backwards",
+   body:"Once all words are stored in order, printing from the LAST stored word back to the FIRST reverses the word order — no swapping needed, just reverse iteration.",
+   trap:"Forgetting the conditional space between words (printing a trailing space after the last word) is a common cosmetic bug."}
+ ],
+ code:[
+  {t:'<span class="ty">char</span> words[MAXW][<span class="num">30</span>]; <span class="ty">int</span> wc=<span class="num">0</span>;',note:"2D buffer: each row is one word."},
+  {t:'<span class="ty">int</span> idx=<span class="num">0</span>,wi=<span class="num">0</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;;i++){'},
+  {t:'  <span class="kw">if</span>(s[i]==<span class="str">\' \'</span>||s[i]==<span class="str">\'\\0\'</span>){',note:"Word boundary: space OR end of string.",hl:true},
+  {t:'    words[wc][wi]=<span class="str">\'\\0\'</span>; wc++; wi=<span class="num">0</span>;',note:"Close off the current word buffer."},
+  {t:'    <span class="kw">if</span>(s[i]==<span class="str">\'\\0\'</span>) <span class="kw">break</span>;',note:"Stop after the final word."},
+  {t:'  } <span class="kw">else</span> { words[wc][wi++]=s[i]; }',note:"Accumulate characters into the current word."},
+  {t:'}'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=wc-<span class="num">1</span>;i&gt;=<span class="num">0</span>;i--) <span class="fn">printf</span>(<span class="str">"%s%s"</span>, words[i], i&gt;<span class="num">0</span>?<span class="str">" "</span>:<span class="str">"\\n"</span>);',note:"Print from LAST word to FIRST.",hl:true}
+ ],
+ mem:{
+  title:"Splitting \"Hello World from Retail Systems\"",
+  vars:["current char","words[0]","words[1]","...","wc"],
+  steps:[
+   {desc:"Reading 'H','e','l','l','o' into words[0]",set:{"words[0]":"Hello"},chg:["words[0]"]},
+   {desc:"Space hit → words[0]='Hello' closed. wc=1",set:{wc:"1"},chg:["wc"]},
+   {desc:"Reading 'W','o','r','l','d' into words[1]. Space → closed. wc=2",set:{"words[1]":"World",wc:"2"},chg:["words[1]","wc"]},
+   {desc:"...continues through 'from','Retail','Systems'. Final wc=5",set:{wc:"5"},chg:["wc"]},
+   {desc:"Print from i=4 down to i=0: <span class='exec'>Systems Retail from World Hello</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Original: Hello World from Retail Systems"},
+  {o:"Reversed word order: Systems Retail from World Hello"}
+ ],
+ better:{
+  naive:"Fixed-size word buffers (30 chars, 20 words) impose silent limits — a longer word or sentence would overflow or truncate without warning.",
+  improvements:[
+   "<b>Bounds-check word length</b> during accumulation to avoid overflowing a single word's buffer.",
+   "<b>Handle multiple consecutive spaces</b> gracefully — the current logic would create empty 'words' for consecutive spaces, needing a skip-empty check.",
+   "<b>Dynamically size the word array</b> (or use a single-pass in-place reversal via pointer swapping) for arbitrary-length sentences."
+  ],
+  complexity:["Time: O(n) in sentence length","Space: O(n) for the word buffer (proportional to input size)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Reversing \"one two three\" by word gives?",
+   opts:["\"eerht owt eno\"","\"three two one\"","\"one two three\"","Error"],ans:1,
+   exp:"<b>\"three two one\".</b> Word ORDER reverses (not the letters within each word)."},
+  {type:"spot-the-bug",q:"What breaks if the word-ending check only tests for a space, not '\\0'?",
+   opts:["Nothing","The last word in the sentence never gets closed off and stored","Compile error","Extra word appears"],ans:1,
+   exp:"<b>Missing final word.</b> If the sentence doesn't end with a trailing space, only checking for spaces means the last word never triggers the close-off logic."},
+  {type:"fill-in-the-blank",q:"To print words in reverse order, iterate the word array from index wc-1 down to ____.",
+   answer:"0",exp:"Reverse iteration from the last stored word back to index 0 reconstructs the reversed sentence."}
+ ]
+},
+{
+ id:"pq59", unit:"Unit 3", tab:"Q59 · Matrix mult cache",
+ title:"Matrix multiplication and cache-friendliness",
+ question:"Multiply two n×n matrices; explain why the naive approach is cache-unfriendly; implement a transposed version.",
+ aim:"See how memory access PATTERN (not just algorithm complexity) affects real-world performance.",
+ file:"q59.c",
+ syntax:[
+  {tok:"naive: B accessed column-wise", why:"Poor spatial locality",
+   body:"In <code>s += A[i][k]*B[k][j]</code>, as k increases, B[k][j] jumps to a completely different row each time — a large stride through memory, defeating CPU cache prefetching.",
+   trap:"The algorithm is still O(n³) either way — this is purely about the CONSTANT FACTOR from memory access patterns, not big-O complexity."},
+  {tok:"transpose B first", why:"Convert column access to row access",
+   body:"After transposing B into BT, the inner loop accesses <code>BT[j][k]</code> — now k walks along a single row of BT, which IS sequential in memory.",
+   trap:"The transpose itself costs O(n²) time/space — worth it only because the O(n³) multiply's memory pattern improves so much."},
+  {tok:"row-major storage", why:"Why sequential access matters",
+   body:"C stores 2D arrays row-major: <code>arr[i][j]</code> and <code>arr[i][j+1]</code> are adjacent in memory. Sequential access along a row lets the CPU cache work efficiently; jumping between rows does not."},
+ ],
+ code:[
+  {t:'<span class="cm">// Naive: B accessed column-wise (k varies, j fixed) — cache-unfriendly</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++)<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;N;j++){'},
+  {t:'  <span class="ty">int</span> s=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;N;k++) s+=A[i][k]*B[k][j];',note:"B[k][j]: k increments, jumping between ROWS of B each time.",hl:true},
+  {t:'  C[i][j]=s;'},
+  {t:'}'},
+  {t:'<span class="cm">// Transpose B, then access row-wise — cache-friendly</span>',hl:true},
+  {t:'<span class="kw">for</span>(...) BT[j][i]=B[i][j];',note:"One-time O(n²) transpose."},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++)<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;N;j++){'},
+  {t:'  <span class="ty">int</span> s=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;N;k++) s+=A[i][k]*BT[j][k];',note:"BT[j][k]: k increments ALONG one row of BT — sequential memory access!",hl:true},
+  {t:'  C[i][j]=s;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Memory access pattern comparison",
+  vars:["access pattern","cache behavior"],
+  steps:[
+   {desc:"Naive B[k][j]: k=0,1,2... each jumps to a different ROW of B (stride = N ints apart)",set:{"access pattern":"B[0][j], B[1][j], B[2][j]...","cache behavior":"cache miss each time"},chg:["access pattern","cache behavior"]},
+   {desc:"Transposed BT[j][k]: k=0,1,2... walks ALONG one row of BT (stride = 1 int)",set:{"access pattern":"BT[j][0], BT[j][1], BT[j][2]...","cache behavior":"sequential, cache-friendly"},chg:["access pattern","cache behavior"]},
+   {desc:"Same mathematical result, <span class='exec'>very different memory behavior</span> at scale",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Naive time: 0.0031s"},
+  {o:"Transposed time: 0.0035s"},
+  {o:"Both produce identical C matrix; transposed accesses memory sequentially."}
+ ],
+ better:{
+  naive:"At small matrix sizes (like N=100 in this demo) the cache effect may not show clearly — the real difference appears dramatically at larger N (500+) where B no longer fits in cache.",
+  improvements:[
+   "<b>Test at larger N</b> (500-2000) to actually observe the performance gap — cache effects are subtle at small scales that fit entirely in cache anyway.",
+   "<b>Loop tiling/blocking</b> is the more advanced technique real BLAS libraries use — processing sub-blocks that fit in cache, rather than a full transpose.",
+   "<b>This is a great illustration</b> that algorithmic complexity (O(n³) either way) doesn't tell the whole performance story — memory access patterns matter enormously in practice."
+  ],
+  complexity:["Both: O(n³) arithmetic operations","Transpose overhead: O(n²) extra, usually worth it","Space: O(n²) for the transposed copy"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why is B[k][j] with k varying considered 'cache-unfriendly'?",
+   opts:["It's not, it's fine","Each increment of k jumps to a different row, far apart in memory","It's faster","No difference from row access"],ans:1,
+   exp:"<b>Large memory strides.</b> C stores 2D arrays row-major, so B[k][j] for increasing k jumps N elements at a time — defeating the CPU cache's ability to prefetch nearby data."},
+  {type:"spot-the-bug",q:"What is the actual algorithmic (big-O) complexity difference between the naive and transposed versions?",
+   opts:["Transposed is O(n²), naive is O(n³)","None — both are O(n³); the difference is real-world speed from memory patterns","Transposed is O(n log n)","Naive is faster in big-O terms"],ans:1,
+   exp:"<b>No big-O difference.</b> Both are O(n³) multiply operations; the transposed version's speedup comes from cache-friendlier memory access, not fewer operations."},
+  {type:"fill-in-the-blank",q:"C arrays are stored ____-major, meaning elements in the same row are adjacent in memory.",
+   answer:"row",exp:"Row-major storage means arr[i][j] and arr[i][j+1] sit next to each other; arr[i][j] and arr[i+1][j] do not."}
+ ]
+},
+{
+ id:"pq60", unit:"Unit 3", tab:"Q60 · Dutch flag",
+ title:"Segregating 0s/1s, then the Dutch National Flag",
+ question:"Segregate 0s and 1s in one pass, no extra space; generalize to three values (0,1,2).",
+ aim:"Two-pointer partitioning for binary values, then three-pointer partitioning (Dijkstra's algorithm) for three values.",
+ file:"q60.c",
+ syntax:[
+  {tok:"low/high two-pointer (0/1 case)", why:"Partition into two zones",
+   body:"low tracks the boundary of confirmed 0s from the left; high tracks confirmed 1s from the right. Swap when a 0 is found on the high side (or vice versa).",
+   trap:"Not advancing the correct pointer after each check (0→low++, 1 seen at high→high--) can leave the array unsorted or loop forever."},
+  {tok:"low/mid/high three-pointer (Dutch flag)", why:"Three zones for three values",
+   body:"low/mid/high maintain three regions: [0,low) are 0s, [low,mid) are 1s, (high,n) are 2s. mid scans the unknown middle region.",
+   trap:"After swapping a 2 to the high end, mid must NOT advance (the swapped-in value from high hasn't been checked yet) — but after swapping a 0, mid SHOULD advance (low's old value was already known to be a 1, safe to move past)."},
+  {tok:"mid stays or moves depending on swap direction", why:"Asymmetry between the 0-case and 2-case",
+   body:"Swapping with low (0 case) always brings in a value that was already scanned (part of the confirmed-1 region), safe to advance mid. Swapping with high (2 case) brings in an UNKNOWN value, so mid must recheck it.",
+   trap:"Treating both swap cases symmetrically (always advancing mid) is the classic Dutch-flag implementation bug."}
+ ],
+ code:[
+  {t:'<span class="cm">// 0/1 segregation</span>'},
+  {t:'<span class="ty">int</span> low=<span class="num">0</span>,high=n-<span class="num">1</span>;'},
+  {t:'<span class="kw">while</span>(low&lt;high){'},
+  {t:'  <span class="kw">if</span>(arr[low]==<span class="num">0</span>) low++;'},
+  {t:'  <span class="kw">else if</span>(arr[high]==<span class="num">1</span>) high--;'},
+  {t:'  <span class="kw">else</span> { <span class="cm">swap arr[low],arr[high]</span>; }',hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Dutch flag (0,1,2) — Dijkstra\'s three-way partition</span>',hl:true},
+  {t:'<span class="ty">int</span> low=<span class="num">0</span>,mid=<span class="num">0</span>,high=n-<span class="num">1</span>;'},
+  {t:'<span class="kw">while</span>(mid&lt;=high){'},
+  {t:'  <span class="kw">if</span>(arr[mid]==<span class="num">0</span>){ swap(low,mid); low++;mid++; }',note:"Swapped-in value was already known-good (a 1) — safe to advance mid.",hl:true},
+  {t:'  <span class="kw">else if</span>(arr[mid]==<span class="num">1</span>) mid++;'},
+  {t:'  <span class="kw">else</span> { swap(mid,high); high--; }',note:"Swapped-in value from high is UNKNOWN — do NOT advance mid, recheck it next iteration.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Dutch flag on [2,0,1,2,1,0,0,2,1]",
+  vars:["low","mid","high","arr[mid]"],
+  steps:[
+   {desc:"low=0,mid=0,high=8. arr[0]=2 → swap with arr[8], high--. mid stays (unknown swapped-in value)",set:{low:"0",mid:"0",high:"7"},chg:["low","mid","high"]},
+   {desc:"arr[mid]=arr[0] now =1 (was swapped in) → just mid++",set:{mid:"1"},chg:["mid"]},
+   {desc:"arr[1]=0 → swap with arr[low=0], low++, mid++ (swapped-in value was a known 1)",set:{low:"1",mid:"2"},chg:["low","mid"]},
+   {desc:"...continues until mid&gt;high. <span class='exec'>Final: 0,0,0,1,1,1,2,2,2</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"0/1 segregated: 0 0 0 0 1 1 1 1"},
+  {o:"Dutch flag (0,1,2): 0 0 0 1 1 1 2 2 2"}
+ ],
+ better:{
+  naive:"Both algorithms are already optimal (O(n) time, O(1) space) — the 'naive' alternative here would be a full sort, which is unnecessarily O(n log n) for just 2-3 distinct values.",
+  improvements:[
+   "<b>These ARE the optimal solutions</b> — Dijkstra's three-way partition is a classic, interview-favorite algorithm precisely because it's O(n) single-pass.",
+   "<b>Generalizing beyond 3 values</b> requires a different approach (e.g. counting sort) since the three-pointer trick specifically exploits having exactly 3 categories.",
+   "<b>This exact pattern</b> underlies quicksort's three-way partitioning optimization for arrays with many duplicate keys."
+  ],
+  complexity:["Time: O(n) — single pass, each element touched a constant number of times","Space: O(1) — in-place partitioning"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After swapping a 0 into position (in the Dutch flag algorithm), why does mid advance?",
+   opts:["No reason, just convention","The value swapped IN from low was already confirmed as a 1 — safe to move past","It shouldn't advance","Only advances for 2s"],ans:1,
+   exp:"<b>Known-safe swap.</b> The value that arrives at mid from the low pointer's old position was always a confirmed 1 (since low tracks the boundary of the 1-region) — no need to recheck it."},
+  {type:"spot-the-bug",q:"Why must mid NOT advance after swapping a 2 to the high end?",
+   opts:["No reason, it should advance","The newly swapped-in value from high is UNKNOWN and must be examined next","Speeds up the algorithm","It's a typo in the algorithm"],ans:1,
+   exp:"<b>Unknown swapped-in value.</b> Whatever was at 'high' before the swap could be a 0, 1, or 2 — mid needs to check it on the NEXT iteration rather than skip past it."},
+  {type:"fill-in-the-blank",q:"The three-way partitioning algorithm for 0/1/2 arrays is known as the ____ National Flag algorithm.",
+   answer:"Dutch",exp:"Named by Dijkstra after the three-striped Dutch flag, representing the three partitioned regions."}
+ ]
+}
+];
+/* ===== PRACTICE QUESTIONS — UNIT 3 (Q61–75) ===== */
+PRACTICE_U3.push(
+{
+ id:"pq61", unit:"Unit 3", tab:"Q61 · Marks register",
+ title:"Student marks register: rows and columns",
+ question:"5 students × 5 subjects: compute row-wise and column-wise totals/averages and find the top scorer.",
+ aim:"Accumulate two different sums (per-student, per-subject) in the same nested-loop pass.",
+ file:"q61.c",
+ syntax:[
+  {tok:"rowTotal[] and colTotal[]", why:"Two separate accumulators",
+   body:"Both arrays are updated inside the SAME nested loop — <code>rowTotal[i]</code> sums across a student's subjects, <code>colTotal[j]</code> sums down a subject's students, simultaneously.",
+   trap:"Forgetting to initialize both arrays to zero before accumulating gives garbage starting sums."},
+  {tok:"single pass, dual purpose", why:"Efficiency: one scan, two results",
+   body:"Rather than looping the whole matrix twice (once for rows, once for columns), a single nested loop updates both totals at once — halves the total work.",
+   trap:"Looping separately for rows then columns isn't wrong, just less efficient — a missed optimization, not a bug."},
+  {tok:"track (bestI,bestJ) while scanning", why:"Find the max without a second pass",
+   body:"A running best-value-and-position pair, updated inline during the same scan, finds the overall highest scorer without any extra iteration.",
+   trap:"Using >= instead of > for the comparison would make 'best' track the LAST tied-maximum instead of the first — a subtle tie-breaking difference."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> rowTotal[<span class="num">5</span>]={<span class="num">0</span>}, colTotal[<span class="num">5</span>]={<span class="num">0</span>};',note:"Both zero-initialized before accumulating.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">5</span>;i++) <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;<span class="num">5</span>;j++){'},
+  {t:'  rowTotal[i]+=marks[i][j]; colTotal[j]+=marks[i][j];',note:"ONE pass updates BOTH accumulators.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> bestVal=-<span class="num">1</span>,bestI=<span class="num">0</span>,bestJ=<span class="num">0</span>;'},
+  {t:'<span class="kw">for</span>(...) <span class="kw">if</span>(marks[i][j]&gt;bestVal){bestVal=marks[i][j];bestI=i;bestJ=j;}',note:"Track the max and its position, updated inline.",hl:true}
+ ],
+ mem:{
+  title:"Accumulating row 0 and column 0",
+  vars:["i,j","marks[i][j]","rowTotal[0]","colTotal[0]"],
+  steps:[
+   {desc:"i=0,j=0: marks=85. rowTotal[0]=85, colTotal[0]=85",set:{"i,j":"0,0","marks[i][j]":"85","rowTotal[0]":"85","colTotal[0]":"85"},chg:["i,j","marks[i][j]","rowTotal[0]","colTotal[0]"]},
+   {desc:"i=0,j=1: marks=90. rowTotal[0]=175 (still building student 0's row). colTotal[1] separately starts at 90",set:{"i,j":"0,1","marks[i][j]":"90","rowTotal[0]":"175"},chg:["i,j","marks[i][j]","rowTotal[0]"]},
+   {desc:"...after full row 0 (i=0,j=0..4): rowTotal[0]=433 complete",set:{"rowTotal[0]":"433"},chg:["rowTotal[0]"]},
+   {desc:"i=1,j=0: colTotal[0] continues accumulating: 85+70=155",set:{"i,j":"1,0","colTotal[0]":"155"},chg:["i,j","colTotal[0]"]}
+  ]
+ },
+ output:[
+  {o:"Student 1: total=433 avg=86.6"},
+  {o:"Subject 1: total=410 avg=82.0"},
+  {o:"Highest overall: Student 5, Subject 1 = 100"}
+ ],
+ better:{
+  naive:"Fixed 5×5 size is inflexible; no handling for missing/invalid marks (e.g. negative or over-100 values).",
+  improvements:[
+   "<b>Parameterize dimensions</b> (numStudents, numSubjects) instead of hardcoding 5×5 everywhere.",
+   "<b>Validate mark ranges</b> (0-100) when reading input, rejecting or flagging impossible values.",
+   "<b>Track top-3 or a full ranking</b> rather than just the single highest, using a small sorted insert as you scan."
+  ],
+  complexity:["Time: O(rows×cols) — single pass for everything","Space: O(rows+cols) for the two total arrays"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why update both rowTotal[i] and colTotal[j] inside the SAME nested loop instead of two separate loops?",
+   opts:["No reason, just style","One pass over the matrix computes both, instead of scanning twice","It's required syntax","Faster only for small matrices"],ans:1,
+   exp:"<b>Efficiency.</b> A single scan through every cell can update both accumulators at once — no need to traverse the whole matrix again for the second total."},
+  {type:"spot-the-bug",q:"What would happen if rowTotal[] weren't initialized to {0} before the loop?",
+   opts:["No difference","Totals would start from garbage stack values, giving wrong sums","Compile error","Only affects colTotal"],ans:1,
+   exp:"<b>Garbage accumulation.</b> Uninitialized local arrays contain indeterminate values; adding onto that garbage produces meaningless totals."},
+  {type:"fill-in-the-blank",q:"The average score for a subject is its column total divided by the number of ____.",
+   answer:"students",exp:"colTotal[j] sums one subject across all students, so dividing by the student count gives that subject's average."}
+ ]
+},
+{
+ id:"pq62", unit:"Unit 3", tab:"Q62 · Anagram check",
+ title:"Anagram detection without sorting",
+ question:"Check if two strings are anagrams without sorting, using an array as a frequency counter, O(n) time, handling case/spaces.",
+ aim:"Increment counts for one string's letters, decrement for the other's, and confirm everything nets to zero.",
+ file:"q62.c",
+ syntax:[
+  {tok:"freq[26], increment then decrement", why:"Net-zero test",
+   body:"Adding 1 per letter in string A, then subtracting 1 per letter in string B, means if the strings are true anagrams, every slot ends at exactly 0.",
+   trap:"If you only increment (never decrement) and compare two separate arrays, you've just reimplemented sorting-by-counting less efficiently — the shared-array subtract trick is the elegant part."},
+  {tok:"isalpha guard", why:"Ignore spaces/punctuation",
+   body:"Only letters affect the frequency count — spaces (like in \"Dirty Room\" vs \"Dormitory\") are simply skipped, letting multi-word anagrams work correctly.",
+   trap:"Not filtering non-letters would make spacing differences (one space vs none) incorrectly break the anagram match."},
+  {tok:"tolower normalization", why:"Case-insensitive comparison",
+   body:"Converting every letter to lowercase before indexing means 'D' and 'd' hit the same frequency slot, making the check case-insensitive.",
+   trap:"Skipping normalization means \"Dormitory\" and \"dormitory\" wouldn't match despite being the same letters."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">isAnagram</span>(<span class="ty">const char</span>*a,<span class="ty">const char</span>*b){'},
+  {t:'  <span class="ty">int</span> freq[<span class="num">26</span>]={<span class="num">0</span>};'},
+  {t:'  <span class="kw">for</span>(...) <span class="kw">if</span>(<span class="fn">isalpha</span>(a[i])) freq[<span class="fn">tolower</span>(a[i])-<span class="str">\'a\'</span>]++;',note:"Increment for string A, ignoring non-letters, case-insensitive.",hl:true},
+  {t:'  <span class="kw">for</span>(...) <span class="kw">if</span>(<span class="fn">isalpha</span>(b[i])) freq[<span class="fn">tolower</span>(b[i])-<span class="str">\'a\'</span>]--;',note:"Decrement for string B — same array!",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">26</span>;i++) <span class="kw">if</span>(freq[i]!=<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;',note:"Every slot must net to exactly zero.",hl:true},
+  {t:'  <span class="kw">return</span> <span class="num">1</span>;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Checking 'listen' vs 'silent'",
+  vars:["freq['l']","freq['i']","freq['s']","freq['e']","freq['n']","freq['t']"],
+  steps:[
+   {desc:"After scanning 'listen': l=1,i=1,s=1,e=1,n=1,t=1",set:{"freq['l']":"1","freq['i']":"1","freq['s']":"1","freq['e']":"1","freq['n']":"1","freq['t']":"1"},chg:["freq['l']","freq['i']","freq['s']","freq['e']","freq['n']","freq['t']"]},
+   {desc:"After decrementing for 'silent': s-1,i-1,l-1,e-1,n-1,t-1",set:{"freq['l']":"0","freq['i']":"0","freq['s']":"0","freq['e']":"0","freq['n']":"0","freq['t']":"0"},chg:["freq['l']","freq['i']","freq['s']","freq['e']","freq['n']","freq['t']"]},
+   {desc:"All slots net to 0 → <span class='exec'>Anagram confirmed!</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"'listen' vs 'silent': Anagram"},
+  {o:"'Dormitory' vs 'Dirty Room': Anagram"},
+  {o:"'hello' vs 'world': Not anagram"}
+ ],
+ better:{
+  naive:"A sort-and-compare approach (sort both strings, check equality) works but is O(n log n); the frequency-array trick is asymptotically better at O(n).",
+  improvements:[
+   "<b>The frequency-array technique</b> (shown here) is optimal: O(n) time vs O(n log n) for a sort-based approach.",
+   "<b>Early length check</b>: if the two strings have very different letter counts (after stripping non-letters), you can often reject faster before the full scan.",
+   "<b>For Unicode/non-ASCII text</b>, this fixed 26-slot array wouldn't suffice — you'd need a hash map keyed by character instead."
+  ],
+  complexity:["Time: O(n+m) for strings of length n and m","Space: O(26) = O(1) — fixed regardless of string length"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why decrement the SAME freq array for string B instead of using a second array and comparing?",
+   opts:["No reason, both work identically in complexity","Sharing one array with net-zero check avoids a separate comparison step","Faster only for short strings","Required by C"],ans:1,
+   exp:"<b>Elegant single check.</b> Using one shared array means the final verification is just 'is everything zero', rather than comparing two separate 26-element arrays element-by-element (which would be equivalent work, just structured differently)."},
+  {type:"spot-the-bug",q:"Why use isalpha() before incrementing/decrementing?",
+   opts:["Unnecessary","Skips spaces and punctuation so multi-word phrases can still match","Speeds up the code","Required syntax"],ans:1,
+   exp:"<b>Ignore non-letters.</b> This is exactly what lets \"Dormitory\" match \"Dirty Room\" — the space is simply skipped rather than treated as a mismatching character."},
+  {type:"fill-in-the-blank",q:"Two strings are anagrams if and only if every entry in the shared frequency array nets to ____.",
+   answer:"0",exp:"A net-zero across all 26 slots means every letter's count in A was exactly balanced by its count in B."}
+ ]
+},
+{
+ id:"pq63", unit:"Unit 3", tab:"Q63 · Two stacks, one array",
+ title:"Two stacks sharing one array",
+ question:"Implement a stack using a 1D array; then simulate two stacks from opposite ends, proving they never collide.",
+ aim:"Grow one stack's top pointer upward from index 0, and the other's downward from the last index.",
+ file:"q63.c",
+ syntax:[
+  {tok:"top1 starts at -1, grows up", why:"Stack 1 fills from the front",
+   body:"<code>top1</code> begins below the array (-1, empty) and increments as values are pushed, filling indices 0,1,2,... upward.",
+   trap:"Off-by-one: using top1 (not top1+1) as the write index before incrementing would overwrite the current top instead of writing a new slot."},
+  {tok:"top2 starts at SIZE, grows down", why:"Stack 2 fills from the back",
+   body:"<code>top2</code> begins past the array's end (SIZE, empty) and decrements as values are pushed, filling indices SIZE-1, SIZE-2,... downward.",
+   trap:"Symmetric to stack 1 but in the opposite direction — mixing up increment/decrement direction between the two stacks is the classic bug."},
+  {tok:"overflow check: top1+1 < top2", why:"Detect when the stacks would collide",
+   body:"Since both stacks share the same array, pushing is only safe if there's still room between them — checked before every push.",
+   trap:"Skipping this check lets one stack silently overwrite the other's data once they'd otherwise meet in the middle."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> top1=-<span class="num">1</span>, top2=SIZE;',note:"Stack 1 starts empty from the front; stack 2 starts empty from the back.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">push1</span>(<span class="ty">int</span> v){ <span class="kw">if</span>(top1+<span class="num">1</span>&lt;top2){ arr[++top1]=v; } <span class="kw">else</span> ...overflow... }',note:"Check for room BEFORE writing; pre-increment then write.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">push2</span>(<span class="ty">int</span> v){ <span class="kw">if</span>(top2-<span class="num">1</span>&gt;top1){ arr[--top2]=v; } <span class="kw">else</span> ...overflow... }',note:"Mirror logic, growing downward.",hl:true},
+  {t:'<span class="ty">int</span> <span class="fn">pop1</span>(){ <span class="kw">return</span> top1&gt;=<span class="num">0</span> ? arr[top1--] : -<span class="num">9999</span>; }',note:"Post-decrement: read current top, then shrink."}
+ ],
+ mem:{
+  title:"Pushing 1,2,3 onto stack1; 100,200 onto stack2",
+  vars:["top1","top2","arr[0..2]","arr[8..9]"],
+  steps:[
+   {desc:"push1(1): top1=-1+1=0, arr[0]=1",set:{top1:"0","arr[0..2]":"1"},chg:["top1","arr[0..2]"]},
+   {desc:"push1(2),push1(3): top1=2, arr=[1,2,3]",set:{top1:"2","arr[0..2]":"1,2,3"},chg:["top1","arr[0..2]"]},
+   {desc:"push2(100): top2=10-1=9, arr[9]=100",set:{top2:"9","arr[8..9]":"100"},chg:["top2","arr[8..9]"]},
+   {desc:"push2(200): top2=8, arr[8]=200. <span class='exec'>Stacks grow toward each other but never meet (top1=2 < top2=8)</span>",set:{top2:"8","arr[8..9]":"200,100"},chg:["top2","arr[8..9]"]}
+  ]
+ },
+ output:[
+  {o:"Stack1 pop: 3 then 2"},
+  {o:"Stack2 pop: 200"},
+  {o:"They share one array, grow from opposite ends, never collide while top1<top2."}
+ ],
+ better:{
+  naive:"A fixed SIZE with two separate stacks growing from opposite ends is efficient but doesn't dynamically rebalance if one stack needs much more space than the other.",
+  improvements:[
+   "<b>This exact technique</b> is genuinely optimal for two stacks with unpredictable relative sizes — better than splitting the array into two fixed halves.",
+   "<b>Add clear error messages</b> distinguishing which stack overflowed, for easier debugging.",
+   "<b>For MORE than two stacks</b>, this two-ended trick doesn't generalize directly — you'd need a more complex space-sharing scheme."
+  ],
+  complexity:["Time: O(1) for push/pop on either stack","Space: O(SIZE) shared between both stacks — better utilization than two separate fixed-size arrays"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After push1(1),push1(2),push1(3), what does pop1() return first?",
+   opts:["1","2","3","-9999"],ans:2,
+   exp:"<b>3.</b> Stacks are LIFO (last in, first out) — 3 was pushed most recently, so it pops first."},
+  {type:"spot-the-bug",q:"Why check <code>top1+1 < top2</code> before pushing onto stack 1, rather than just checking <code>top1 < SIZE</code>?",
+   opts:["No difference","Because stack 2 also occupies part of the same array — the real boundary is wherever stack 2 currently ends","Faster","Required syntax"],ans:1,
+   exp:"<b>Shared array boundary.</b> The two stacks share one array, so stack 1's real limit isn't the array's end — it's wherever stack 2's current top happens to be."},
+  {type:"fill-in-the-blank",q:"Stack 2's top pointer starts at index ____ (one past the last valid index) when empty.",
+   answer:"SIZE",exp:"top2=SIZE represents an empty stack 2, symmetric to top1=-1 for stack 1."}
+ ]
+},
+{
+ id:"pq64", unit:"Unit 3", tab:"Q64 · Saddle points",
+ title:"Finding saddle points in a matrix",
+ question:"Find elements that are minimum in their row AND maximum in their column. When does none exist? When multiple?",
+ aim:"For each row, find its minimum, then verify that value is also the maximum in its column.",
+ file:"q64.c",
+ syntax:[
+  {tok:"row-min search per row", why:"Candidate identification",
+   body:"For each row, scan to find its smallest value and remember which column it's in — this is the CANDIDATE saddle point for that row.",
+   trap:"If a row has multiple equal minimums, only the FIRST one found (by scan order) becomes the candidate — ties aren't all checked."},
+  {tok:"column-max verification", why:"Confirm the candidate qualifies",
+   body:"For the candidate's column, check if any OTHER row has a larger value there — if none does, the candidate really is that column's maximum too.",
+   trap:"Checking 'greater than' instead of 'greater than or equal' matters if there are ties — decide upfront how ties should be handled."},
+  {tok:"a matrix can have 0, 1, or multiple saddle points", why:"Not every matrix has one",
+   body:"Saddle points are a property that doesn't universally exist — some matrices have none, some have exactly one, and (rarely) some can have more than one (typically when they'd all have the same value)."}
+ ],
+ code:[
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">3</span>;i++){'},
+  {t:'  <span class="ty">int</span> rowMin=mat[i][<span class="num">0</span>], rowMinJ=<span class="num">0</span>;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">1</span>;j&lt;<span class="num">4</span>;j++) <span class="kw">if</span>(mat[i][j]&lt;rowMin){ rowMin=mat[i][j]; rowMinJ=j; }',note:"Find this row's minimum and remember its column.",hl:true},
+  {t:'  <span class="ty">int</span> isColMax=<span class="num">1</span>;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;<span class="num">3</span>;k++) <span class="kw">if</span>(mat[k][rowMinJ]&gt;rowMin){ isColMax=<span class="num">0</span>; <span class="kw">break</span>; }',note:"Verify: does any OTHER row beat this value in the SAME column?",hl:true},
+  {t:'  <span class="kw">if</span>(isColMax) <span class="fn">printf</span>(<span class="str">"Saddle point: [%d][%d]=%d\\n"</span>,i,rowMinJ,rowMin);',hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Finding the saddle point in {{4,5,6},{2,8,9},{3,7,8}}",
+  vars:["row","rowMin","rowMinJ","isColMax?"],
+  steps:[
+   {desc:"Row 0: min(4,5,6)=4 at column 0",set:{row:"0",rowMin:"4",rowMinJ:"0"},chg:["row","rowMin","rowMinJ"]},
+   {desc:"Check column 0 for a larger value: mat[1][0]=2, mat[2][0]=3 — neither beats 4",set:{"isColMax?":"yes so far"},chg:["isColMax?"]},
+   {desc:"No row beats 4 in column 0 → <span class='exec'>Saddle point confirmed at [0][0]=4</span>",set:{"isColMax?":"YES"},chg:["isColMax?"]},
+   {desc:"Row 1: min(2,8,9)=2 at col 0. But mat[0][0]=4 > 2 → NOT a column max. Rejected.",set:{row:"1",rowMin:"2","isColMax?":"NO"},chg:["row","rowMin","isColMax?"]}
+  ]
+ },
+ output:[{o:"Saddle point: mat[0][0]=4"}],
+ better:{
+  naive:"The nested-loop approach is O(rows×cols) per row for the verification, giving O(rows²×cols) overall — fine for small matrices, but could be optimized.",
+  improvements:[
+   "<b>Precompute column maximums once</b> (O(rows×cols)) before the row scan, turning each verification into an O(1) lookup instead of an O(rows) rescan.",
+   "<b>Handle multiple saddle points</b> explicitly by not breaking after the first found — continue checking all rows.",
+   "<b>Understand the 'no saddle point' case</b> is common and completely valid — most random matrices won't have one."
+  ],
+  complexity:["Current: O(rows × cols) to find row minimums, O(rows² ) for verification","Optimized (precomputed column maxes): O(rows × cols) total"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Does every matrix have at least one saddle point?",
+   opts:["Yes, always","No — many matrices have none","Only square matrices do","Only if sorted"],ans:1,
+   exp:"<b>No.</b> Saddle points are a special property; most arbitrary matrices have zero saddle points, some have exactly one, and it's possible (though less common) to have several."},
+  {type:"spot-the-bug",q:"Why check ALL other rows in the candidate's column, not just adjacent rows?",
+   opts:["Unnecessary","The maximum could be in any row, not just neighboring ones","Faster to check only neighbors","No difference"],ans:1,
+   exp:"<b>Global column check.</b> A column maximum could occur in any row of that column — restricting the check to just nearby rows would miss valid disqualifying values."},
+  {type:"fill-in-the-blank",q:"A saddle point is the minimum of its ____ and the maximum of its column.",
+   answer:"row",exp:"By definition, a saddle point simultaneously satisfies both conditions."}
+ ]
+},
+{
+ id:"pq65", unit:"Unit 3", tab:"Q65 · Insertion sort strings",
+ title:"Insertion sort: numbers, then strings",
+ question:"Implement insertion sort on numbers, then adapt it to sort strings lexicographically in a 2D char array.",
+ aim:"See how the same shift-and-insert logic transfers from integer comparison to string comparison via strcmp.",
+ file:"q65.c",
+ syntax:[
+  {tok:"key + shift-right pattern", why:"Classic insertion sort structure",
+   body:"Save the current element as 'key', then shift all larger preceding elements one position right, finally dropping key into the gap that opens up.",
+   trap:"Forgetting to save key BEFORE starting the shift loop means you'd overwrite it during the shifting."},
+  {tok:"strcmp instead of >", why:"String comparison isn't a simple operator",
+   body:"You can't use <code>&gt;</code> on char arrays — <code>strcmp(arr[j], key)</code> returns positive/negative/zero to indicate lexicographic order, replacing the numeric comparison.",
+   trap:"Using <code>arr[j] > key</code> directly on char arrays compares POINTER addresses, not string content — always wrong."},
+  {tok:"strcpy instead of =", why:"Can't assign char arrays directly",
+   body:"C doesn't let you do <code>arr[j+1] = arr[j]</code> for whole char arrays — you must <code>strcpy</code> the contents explicitly, char by char under the hood.",
+   trap:"Attempting direct array assignment is a compile error in C — a language quirk that trips up many string-algorithm ports from numbers."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">insertionSort</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;n;i++){'},
+  {t:'    <span class="ty">int</span> key=arr[i], j=i-<span class="num">1</span>;',note:"Save the value before it gets overwritten by shifting."},
+  {t:'    <span class="kw">while</span>(j&gt;=<span class="num">0</span> &amp;&amp; arr[j]&gt;key){ arr[j+<span class="num">1</span>]=arr[j]; j--; }',note:"Numeric comparison with >.",hl:true},
+  {t:'    arr[j+<span class="num">1</span>]=key;'},
+  {t:'  }'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">insertionSortStr</span>(<span class="ty">char</span> arr[][<span class="num">20</span>],<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;n;i++){'},
+  {t:'    <span class="ty">char</span> key[<span class="num">20</span>]; <span class="fn">strcpy</span>(key,arr[i]); <span class="ty">int</span> j=i-<span class="num">1</span>;',note:"strcpy instead of = for saving the current word."},
+  {t:'    <span class="kw">while</span>(j&gt;=<span class="num">0</span> &amp;&amp; <span class="fn">strcmp</span>(arr[j],key)&gt;<span class="num">0</span>){ <span class="fn">strcpy</span>(arr[j+<span class="num">1</span>],arr[j]); j--; }',note:"strcmp replaces >; strcpy replaces =.",hl:true},
+  {t:'    <span class="fn">strcpy</span>(arr[j+<span class="num">1</span>],key);'},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Sorting {banana,apple,cherry,date}",
+  vars:["i","key","j","strcmp result"],
+  steps:[
+   {desc:"i=1, key='apple'. Compare with arr[0]='banana': strcmp>0 (banana>apple) → shift banana right",set:{i:"1",key:"apple","strcmp result":">0 (shift)"},chg:["i","key","strcmp result"]},
+   {desc:"j=-1, stop. Insert 'apple' at position 0. Array: [apple,banana,cherry,date]",set:{},chg:[]},
+   {desc:"i=2, key='cherry'. Compare with 'banana': strcmp<0 (banana<cherry) → no shift needed, insert in place",set:{i:"2",key:"cherry","strcmp result":"<0 (no shift)"},chg:["i","key","strcmp result"]},
+   {desc:"i=3, key='date' — already in correct position relative to all previous. <span class='exec'>Final: apple,banana,cherry,date</span>",set:{i:"3",key:"date"},chg:["i","key"]}
+  ]
+ },
+ output:[
+  {o:"Sorted numbers: 1 2 5 5 6 9"},
+  {o:"Sorted words: apple banana cherry date"}
+ ],
+ better:{
+  naive:"Insertion sort is O(n²) — fine for small n (a handful of words) but not suitable for sorting large word lists.",
+  improvements:[
+   "<b>For large string lists</b>, use qsort with strcmp as the comparator — O(n log n) instead of O(n²).",
+   "<b>Fixed 20-char word buffers</b> limit word length; consider dynamic strings (char*) with proper allocation for arbitrary-length words.",
+   "<b>Insertion sort's real advantage</b>: it's efficient for nearly-sorted data or very small n, and it's stable (preserves relative order of equal elements) — worth knowing when it IS the right choice."
+  ],
+  complexity:["Time: O(n²) worst case for both versions","Space: O(1) extra for numbers, O(word length) extra for the string 'key' buffer"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why can't you write <code>arr[j+1] = arr[j]</code> to copy one word to another in the string version?",
+   opts:["You can, it's fine","C doesn't support direct array assignment — you must use strcpy","Syntax error only for numbers","No reason, it's a style choice"],ans:1,
+   exp:"<b>C forbids array assignment.</b> Char arrays (fixed-size buffers) can't be assigned with <code>=</code> in C — strcpy is required to copy the actual character contents."},
+  {type:"spot-the-bug",q:"What would <code>arr[j] > key</code> do if arr[j] and key are char arrays (not strings compared with strcmp)?",
+   opts:["Compares string content correctly","Compares memory addresses, not content — almost always meaningless","Compile error","Sorts correctly"],ans:1,
+   exp:"<b>Address comparison.</b> Char arrays decay to pointers in most expressions; > would compare their memory addresses, not the actual text they contain."},
+  {type:"fill-in-the-blank",q:"strcmp(a,b) returns a value < 0 when string a comes ____ b lexicographically.",
+   answer:"before",exp:"A negative strcmp result means the first argument sorts earlier (alphabetically before) the second."}
+ ]
+},
+{
+ id:"pq66", unit:"Unit 3", tab:"Q66 · Char frequency",
+ title:"Character frequency analyzer with bar chart",
+ question:"Count letter occurrences (case-insensitive) and print a horizontal bar chart; find rarest and most frequent.",
+ aim:"Tally into a 26-slot array, then render each count as a row of asterisks.",
+ file:"q66.c",
+ syntax:[
+  {tok:"isalpha + tolower tally", why:"Case-insensitive counting",
+   body:"Only letters get counted (via isalpha), and both cases fold into the same slot (via tolower) — 'A' and 'a' increment the same counter.",
+   trap:"Counting without the isalpha guard would also tally spaces, digits, and punctuation into meaningless 'letter' slots."},
+  {tok:"nested loop for the bar", why:"Print N asterisks for count N",
+   body:"For each letter with a non-zero count, an inner loop prints exactly that many '*' characters — a simple ASCII bar chart.",
+   trap:"An off-by-one in the inner loop bound would print one too many or too few asterisks."},
+  {tok:"track max/min while printing", why:"Find extremes in the same pass",
+   body:"While printing each bar, simultaneously compare against a running max and min to identify the most/least frequent letter — no separate pass needed.",
+   trap:"Initializing minF too low (like 0) instead of a large sentinel would make the min-tracking never actually update."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> freq[<span class="num">26</span>]={<span class="num">0</span>};'},
+  {t:'<span class="kw">for</span>(...) <span class="kw">if</span>(<span class="fn">isalpha</span>(s[i])) freq[<span class="fn">tolower</span>(s[i])-<span class="str">\'a\'</span>]++;',note:"Case-insensitive tally, letters only.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">26</span>;i++) <span class="kw">if</span>(freq[i]&gt;<span class="num">0</span>){'},
+  {t:'  <span class="fn">printf</span>(<span class="str">"%c: "</span>, <span class="str">\'a\'</span>+i);'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;freq[i];j++) <span class="fn">printf</span>(<span class="str">"*"</span>);',note:"Print exactly count-many asterisks.",hl:true},
+  {t:'  <span class="kw">if</span>(freq[i]&gt;maxF){maxF=freq[i];maxC=<span class="str">\'a\'</span>+i;}',note:"Track max/min inline while printing.",hl:true},
+  {t:'  <span class="kw">if</span>(freq[i]&lt;minF){minF=freq[i];minC=<span class="str">\'a\'</span>+i;}'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Tallying a pangram-style sentence",
+  vars:["letter","freq[letter]"],
+  steps:[
+   {desc:"'o' appears in 'brown','fox','over','dog' — count builds to 5",set:{"letter":"o","freq[letter]":"5"},chg:["letter","freq[letter]"]},
+   {desc:"'b' appears once in 'brown' — count is 1",set:{"letter":"b","freq[letter]":"1"},chg:["letter","freq[letter]"]},
+   {desc:"Scanning all 26: 'o' becomes the running max (5), 'b' becomes a running min candidate (1)",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"w: * (1)"},{o:"x: ** (2)"},{o:"y: * (1)"},{o:"z: * (1)"},
+  {o:"Most frequent: o (5)  Rarest: b (1)"}
+ ],
+ better:{
+  naive:"A tie for 'rarest' (multiple letters with the same minimum count) only reports the first one found — fine for a demo, but worth being explicit about.",
+  improvements:[
+   "<b>Report ALL tied extremes</b> rather than just the first found, if ties matter for your use case.",
+   "<b>Normalize the bar chart</b> (e.g. scale down if counts are huge) so very long sentences don't produce unwieldy bars.",
+   "<b>Extend to full ASCII</b> or Unicode frequency analysis for more general text processing needs."
+  ],
+  complexity:["Time: O(n) to tally, O(26) to print/analyze — O(n) overall","Space: O(26) = O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why use tolower(s[i]) when indexing the freq array?",
+   opts:["Unnecessary","So 'A' and 'a' both increment the SAME slot, making the count case-insensitive","Speeds up the code","Required syntax"],ans:1,
+   exp:"<b>Case folding.</b> Without it, 'The' and 'the' would tally 't' into two different (non-existent, since there are only 26 slots for lowercase) representations — normalizing case is what makes 26 slots sufficient for all letters."},
+  {type:"spot-the-bug",q:"What must minF be initialized to BEFORE the scanning loop, for the min-tracking to work correctly?",
+   opts:["0","A very large sentinel value (e.g. 999)","-1","1"],ans:1,
+   exp:"<b>Large sentinel.</b> If minF started at 0, no real count (which is ≥1 for letters that appear) could ever be 'less than' it, and minF/minC would never update."},
+  {type:"fill-in-the-blank",q:"Only characters where <code>isalpha()</code> is true get counted, excluding ____ and punctuation.",
+   answer:"spaces",exp:"isalpha filters out spaces, digits, and punctuation, counting only actual letters."}
+ ]
+},
+{
+ id:"pq67", unit:"Unit 3", tab:"Q67 · Circular buffer",
+ title:"Circular buffer with wraparound",
+ question:"Implement enqueue/dequeue on a fixed array with wraparound; distinguish full from empty using index arithmetic.",
+ aim:"Use a separate count variable (not just head/tail comparison) to unambiguously tell full from empty.",
+ file:"q67.c",
+ syntax:[
+  {tok:"head/tail modulo wraparound", why:"Circular indexing",
+   body:"<code>tail=(tail+1)%CAP</code> wraps the write position back to 0 once it reaches the array's end, turning a linear array into a logically circular one.",
+   trap:"Without the modulo, tail would just walk off the end of the array once — no reuse of freed space."},
+  {tok:"count variable — the key insight", why:"head==tail is ambiguous alone",
+   body:"When head equals tail, that COULD mean the buffer is empty OR completely full — a separate <code>count</code> variable resolves the ambiguity unambiguously.",
+   trap:"Some implementations try to distinguish full/empty by sacrificing one slot (never fully filling the array) instead of using a count — also valid, but a different tradeoff."},
+  {tok:"enqueue/dequeue return success flags", why:"Signal full/empty conditions",
+   body:"Both operations return 0 (failure) instead of silently corrupting data when the buffer is full (enqueue) or empty (dequeue).",
+   trap:"Not checking these return values lets a full buffer silently drop data, or an empty buffer read garbage."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> buf[CAP]; <span class="ty">int</span> head=<span class="num">0</span>,tail=<span class="num">0</span>,count=<span class="num">0</span>;',note:"count is the key to resolving full-vs-empty ambiguity.",hl:true},
+  {t:'<span class="ty">int</span> <span class="fn">enqueue</span>(<span class="ty">int</span> v){'},
+  {t:'  <span class="kw">if</span>(count==CAP) <span class="kw">return</span> <span class="num">0</span>; <span class="cm">// full</span>',hl:true},
+  {t:'  buf[tail]=v; tail=(tail+<span class="num">1</span>)%CAP; count++; <span class="kw">return</span> <span class="num">1</span>;',note:"Wraparound write, then grow the logical size.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">dequeue</span>(<span class="ty">int</span>*v){'},
+  {t:'  <span class="kw">if</span>(count==<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>; <span class="cm">// empty</span>',hl:true},
+  {t:'  *v=buf[head]; head=(head+<span class="num">1</span>)%CAP; count--; <span class="kw">return</span> <span class="num">1</span>;',note:"Wraparound read, then shrink logical size."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Filling a CAP=5 buffer, then wrapping",
+  vars:["head","tail","count"],
+  steps:[
+   {desc:"enqueue 1,2,3,4,5: tail wraps 0→1→2→3→4→0(mod5). count=5 (FULL)",set:{tail:"0 (wrapped)",count:"5"},chg:["tail","count"]},
+   {desc:"enqueue(6) fails: count==CAP → returns 0",set:{},chg:[]},
+   {desc:"dequeue(): reads buf[head=0]=1. head→1. count=4",set:{head:"1",count:"4"},chg:["head","count"]},
+   {desc:"enqueue(6) now succeeds: buf[tail=0]=6 (reusing the freed slot!). tail→1. count=5",set:{tail:"1",count:"5"},chg:["tail","count"]}
+  ]
+ },
+ output:[
+  {o:"enqueue(6): FULL (buffer full)"},
+  {o:"dequeued: 1"},
+  {o:"enqueue(6) after space freed: ok (wraps around)"}
+ ],
+ better:{
+  naive:"The count-variable approach uses one extra int but is the clearest; the alternative (sacrifice-one-slot) saves that int but caps usable capacity at CAP-1.",
+  improvements:[
+   "<b>The count-based approach</b> (shown here) is simplest to reason about and uses the FULL capacity — the small extra variable is a good tradeoff.",
+   "<b>Thread-safety</b>: for concurrent producer/consumer use, head/tail/count updates would need atomic operations or locks.",
+   "<b>Peek operation</b>: adding a non-destructive 'peek at front' is a natural extension using the same head index."
+  ],
+  complexity:["Time: O(1) for both enqueue and dequeue","Space: O(CAP) — fixed regardless of how much data flows through"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why can't you distinguish full from empty using only head==tail?",
+   opts:["You can, easily","Both a full and an empty buffer can have head==tail — ambiguous without more info","head never equals tail","Only applies to arrays"],ans:1,
+   exp:"<b>Genuine ambiguity.</b> If head catches up to tail, that's empty; if tail wraps all the way around to meet head, that's full — same index relationship, opposite meanings."},
+  {type:"spot-the-bug",q:"What does <code>tail=(tail+1)%CAP</code> achieve that plain <code>tail++</code> wouldn't?",
+   opts:["Nothing different","Wraps tail back to 0 once it reaches CAP, enabling slot reuse","Makes it faster","Prevents overflow entirely by itself"],ans:1,
+   exp:"<b>Circular wraparound.</b> The modulo makes the index cycle back to 0 after reaching the array's end, which is exactly what makes the buffer 'circular' rather than a simple linear array."},
+  {type:"fill-in-the-blank",q:"The extra variable that resolves the full-vs-empty ambiguity is called ____.",
+   answer:"count",exp:"Tracking the current number of elements directly sidesteps the head/tail ambiguity entirely."}
+ ]
+},
+{
+ id:"pq68", unit:"Unit 3", tab:"Q68 · Rotate matrix",
+ title:"Rotate a matrix 90° clockwise in place",
+ question:"Rotate an n×n matrix 90° clockwise without an auxiliary matrix. Prove the index transformation.",
+ aim:"Compose two simpler in-place operations — transpose, then reverse each row — to achieve the rotation.",
+ file:"q68.c",
+ syntax:[
+  {tok:"transpose: swap mat[i][j] with mat[j][i]", why:"Flip across the main diagonal",
+   body:"Looping only the upper triangle (<code>j starts at i+1</code>) and swapping with its mirror achieves an in-place transpose — each pair swapped exactly once.",
+   trap:"Looping the full matrix (not just the upper triangle) would swap every pair TWICE, undoing the transpose back to the original."},
+  {tok:"reverse each row", why:"Complete the rotation",
+   body:"After transposing, reversing each row (left-right two-pointer swap) completes the 90° clockwise rotation — transpose alone only gets you a diagonal flip.",
+   trap:"Applying the row-reversal BEFORE the transpose (wrong order) produces a 90° counter-clockwise rotation instead, or garbage depending on the exact sequence."},
+  {tok:"composition proof", why:"Why transpose+reverse = rotate 90°",
+   body:"Mathematically, rotating 90° clockwise sends element (i,j) to (j, n-1-i). Transposing sends (i,j)→(j,i); reversing each row then sends (j,i)→(j,n-1-i) — exactly the target formula.",
+   trap:"Deriving this from scratch under exam pressure is hard; memorizing 'transpose then reverse rows = 90° CW' as a pattern is the practical approach."}
+ ],
+ code:[
+  {t:'<span class="cm">// Step 1: Transpose (swap across the diagonal)</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++) <span class="kw">for</span>(<span class="ty">int</span> j=i+<span class="num">1</span>;j&lt;N;j++){',note:"j starts at i+1 — only the upper triangle, each pair swapped ONCE.",hl:true},
+  {t:'  <span class="ty">int</span> t=mat[i][j]; mat[i][j]=mat[j][i]; mat[j][i]=t;'},
+  {t:'}'},
+  {t:'<span class="cm">// Step 2: Reverse each row</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++){'},
+  {t:'  <span class="ty">int</span> l=<span class="num">0</span>,r=N-<span class="num">1</span>;'},
+  {t:'  <span class="kw">while</span>(l&lt;r){ ...swap mat[i][l],mat[i][r]...; l++;r--; }',note:"Standard two-pointer row reversal.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Rotating {{1,2,3},{4,5,6},{7,8,9}} 90° CW",
+  vars:["step","matrix state"],
+  steps:[
+   {desc:"Original: [[1,2,3],[4,5,6],[7,8,9]]",set:{step:"start","matrix state":"1,2,3 / 4,5,6 / 7,8,9"},chg:["step","matrix state"]},
+   {desc:"After transpose: [[1,4,7],[2,5,8],[3,6,9]] — swapped across the diagonal",set:{step:"transposed","matrix state":"1,4,7 / 2,5,8 / 3,6,9"},chg:["step","matrix state"]},
+   {desc:"After reversing each row: [[7,4,1],[8,5,2],[9,6,3]] — <span class='exec'>rotated 90° CW!</span>",set:{step:"row-reversed","matrix state":"7,4,1 / 8,5,2 / 9,6,3"},chg:["step","matrix state"]}
+  ]
+ },
+ output:[
+  {o:"Before:"},{o:"1 2 3"},{o:"4 5 6"},{o:"7 8 9"},
+  {o:"After 90 CW:"},{o:"7 4 1"},{o:"8 5 2"},{o:"9 6 3"}
+ ],
+ better:{
+  naive:"This transpose-then-reverse approach is already the standard optimal in-place technique — an auxiliary matrix approach would use O(n²) extra space unnecessarily.",
+  improvements:[
+   "<b>The two-step composition</b> (shown here) is genuinely optimal: O(n²) time (every cell touched a constant number of times), O(1) extra space.",
+   "<b>For 90° counter-clockwise</b>, reverse each COLUMN first, then transpose (or equivalently, transpose then reverse each row in the OTHER direction) — a nice follow-up derivation.",
+   "<b>Verify with a non-square edge case</b> conceptually: this technique specifically requires N×N (square) matrices — rectangular rotation needs a different approach."
+  ],
+  complexity:["Time: O(n²) — transpose touches each pair once, reversal touches each row once","Space: O(1) — no auxiliary matrix needed"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After transposing {{1,2},{3,4}}, what is the matrix?",
+   opts:["{{1,2},{3,4}} unchanged","{{1,3},{2,4}}","{{4,3},{2,1}}","{{2,1},{4,3}}"],ans:1,
+   exp:"<b>{{1,3},{2,4}}.</b> Transposing swaps element (0,1)=2 with (1,0)=3, flipping across the main diagonal."},
+  {type:"spot-the-bug",q:"Why must the transpose loop use <code>j=i+1</code> as its starting point, not <code>j=0</code>?",
+   opts:["No reason, either works","Starting at 0 would swap every pair twice, undoing the transpose","Faster","Required syntax"],ans:1,
+   exp:"<b>Avoid double-swap.</b> If j started at 0, when i=0,j=1 you'd swap (0,1)with(1,0), and later when i=1,j=0 you'd swap them right back — cancelling the transpose entirely."},
+  {type:"fill-in-the-blank",q:"90° clockwise rotation = transpose, then reverse each ____.",
+   answer:"row",exp:"Transposing flips across the diagonal; reversing each row then completes the clockwise rotation."}
+ ]
+},
+{
+ id:"pq69", unit:"Unit 3", tab:"Q69 · Sentence stats",
+ title:"Word statistics without string library functions",
+ question:"Find total words, average word length, longest, and shortest word — using only character arrays.",
+ aim:"Track word boundaries manually and compare lengths as you go, keeping running 'best' words.",
+ file:"q69.c",
+ syntax:[
+  {tok:"manual word-length tracking", why:"No strlen needed",
+   body:"A running <code>wordLen</code> counter increments per character and resets at each space/end — the same boundary-detection pattern as reversing a sentence (Q58).",
+   trap:"Forgetting to reset wordLen to 0 after processing each word carries over stale counts into the next word."},
+  {tok:"copying into longest/shortest buffers", why:"Preserve the best-so-far word",
+   body:"Whenever a new word beats the current longest/shortest record, its characters are manually copied into a dedicated buffer for later printing.",
+   trap:"Copying by index loop (as done here) instead of using strcpy works fine, but forgetting the null terminator at the end leaves garbage trailing in the buffer."},
+  {tok:"tie-breaking: first word wins", why:"Strict less-than/greater-than comparison",
+   body:"Using strict <code>&gt;</code> and <code>&lt;</code> (not ≥/≤) for updating the records means the FIRST word achieving a given length keeps that record, rather than being overwritten by a later tie.",
+   trap:"Switching to ≥ would make LATER equal-length words overwrite earlier ones — a deliberate design choice either way, but one to be consistent about."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> totalWords=<span class="num">0</span>, totalLen=<span class="num">0</span>, wordLen=<span class="num">0</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;;i++){'},
+  {t:'  <span class="kw">if</span>(s[i]==<span class="str">\' \'</span>||s[i]==<span class="str">\'\\0\'</span>){',note:"Word boundary detection (same pattern as Q58).",hl:true},
+  {t:'    <span class="kw">if</span>(wordLen&gt;<span class="num">0</span>){ totalWords++; totalLen+=wordLen;'},
+  {t:'      <span class="kw">if</span>(wordLen&gt;longestLen){longestLen=wordLen; ...copy to longest...}',note:"Strict > means first-word-wins on ties.",hl:true},
+  {t:'      <span class="kw">if</span>(wordLen&lt;shortestLen){shortestLen=wordLen; ...copy to shortest...}'},
+  {t:'    }'},
+  {t:'    wordLen=<span class="num">0</span>;',note:"Reset for the next word."},
+  {t:'    <span class="kw">if</span>(s[i]==<span class="str">\'\\0\'</span>) <span class="kw">break</span>;'},
+  {t:'  } <span class="kw">else</span> { ...cur[ci++]=s[i]; wordLen++; }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Analyzing \"The quick brown fox jumps\"",
+  vars:["word","wordLen","totalWords","longest","shortest"],
+  steps:[
+   {desc:"'The': wordLen=3. totalWords=1, totalLen=3. First word → becomes both longest AND shortest so far",set:{word:"The",wordLen:"3",totalWords:"1",longest:"The",shortest:"The"},chg:["word","wordLen","totalWords","longest","shortest"]},
+   {desc:"'quick': wordLen=5. 5>3 → new longest='quick'. Not <3 → shortest stays 'The'",set:{word:"quick",wordLen:"5",longest:"quick"},chg:["word","wordLen","longest"]},
+   {desc:"'brown': wordLen=5. Tie with longest(5), but NOT strictly greater → longest stays 'quick' (first-wins)",set:{word:"brown",wordLen:"5"},chg:["word","wordLen"]},
+   {desc:"'fox': wordLen=3. Ties shortest(3) but doesn't beat it strictly → shortest stays 'The'. <span class='exec'>Final: longest=quick(5), shortest=The(3)</span>",set:{word:"fox",wordLen:"3"},chg:["word","wordLen"]}
+  ]
+ },
+ output:[
+  {o:"Total words: 5"},
+  {o:"Average word length: 4.20"},
+  {o:"Longest: quick (5)"},
+  {o:"Shortest: The (3)"}
+ ],
+ better:{
+  naive:"Manually tracking longest/shortest with character-by-character copying works but duplicates a lot of boundary-detection logic that could be factored into a shared helper.",
+  improvements:[
+   "<b>Factor out word-boundary splitting</b> into a reusable helper function shared with Q58's word-reversal — both rely on the identical split pattern.",
+   "<b>Decide tie-breaking policy explicitly</b>: first-found (current behavior) vs last-found vs 'track all ties' are all valid choices depending on requirements.",
+   "<b>Handle multiple consecutive spaces</b> gracefully — the current wordLen>0 guard already skips empty 'words' from double spaces, which is a nice built-in robustness."
+  ],
+  complexity:["Time: O(n) in sentence length","Space: O(word length) for the longest/shortest buffers"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For \"The quick brown fox jumps\", what's the average word length?",
+   opts:["4.0","4.2","5.0","3.8"],ans:1,exp:"<b>4.2.</b> Lengths are 3,5,5,3,5 summing to 21, divided by 5 words = 4.2."},
+  {type:"spot-the-bug",q:"Why does 'quick' (not 'brown', despite tying in length) get reported as the longest word?",
+   opts:["Random","Strict > comparison means the FIRST word to reach that length keeps the record","Alphabetical order","Bug in the code"],ans:1,
+   exp:"<b>First-wins tie-breaking.</b> Since the comparison is strictly <code>wordLen &gt; longestLen</code> (not ≥), a later word of EQUAL length doesn't overwrite the existing record."},
+  {type:"fill-in-the-blank",q:"The wordLen counter must reset to ____ after each word boundary is detected.",
+   answer:"0",exp:"Resetting prevents the next word's length from including leftover count from the previous word."}
+ ]
+},
+{
+ id:"pq70", unit:"Unit 3", tab:"Q70 · Find duplicates",
+ title:"Finding duplicates via index marking",
+ question:"Array of size n, values in range 1..n-1: find all duplicates in O(n) time, O(1) extra space.",
+ aim:"Use each value AS an index to mark visited positions negative — no extra array needed.",
+ file:"q70.c",
+ syntax:[
+  {tok:"value as index", why:"The core trick",
+   body:"Since values are constrained to 1..n-1 (matching valid array indices), you can use a value to INDEX into the same array and mark that position as 'seen'.",
+   trap:"This technique specifically requires values to be within the array's own index range — it doesn't generalize to arbitrary integer values."},
+  {tok:"negate to mark 'visited'", why:"In-place flagging without extra space",
+   body:"Flipping <code>arr[idx]</code> to negative marks 'I've seen the value idx before' without needing a separate boolean array — the sign bit IS the flag.",
+   trap:"Reading a value you might have already negated requires taking its absolute value first, or you'd misinterpret the index."},
+  {tok:"if already negative → duplicate found", why:"Second visit reveals a duplicate",
+   body:"If you go to mark a position and find it's ALREADY negative, that means you've encountered this value before — it's a duplicate.",
+   trap:"Forgetting to take the absolute value of arr[i] before using it as an index would use a negative array index, which is undefined behaviour."}
+ ],
+ code:[
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++){'},
+  {t:'  <span class="ty">int</span> idx = arr[i]&lt;<span class="num">0</span> ? -arr[i] : arr[i];',note:"Take absolute value in case this slot was already negated earlier.",hl:true},
+  {t:'  <span class="kw">if</span>(arr[idx]&lt;<span class="num">0</span>) <span class="fn">printf</span>(<span class="str">"%d "</span>, idx);',note:"Already negative? We've seen this value before — DUPLICATE.",hl:true},
+  {t:'  <span class="kw">else</span> arr[idx] = -arr[idx];',note:"First visit: mark this position as seen by negating it.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Finding duplicates in [4,3,2,7,5,2,3,1] (n=8)",
+  vars:["i","arr[i]","idx","arr[idx]"],
+  steps:[
+   {desc:"i=0: arr[0]=4. idx=4. arr[4]=5 (positive, not yet visited) → negate: arr[4]=-5",set:{i:"0","arr[i]":"4",idx:"4","arr[idx]":"-5"},chg:["i","arr[i]","idx","arr[idx]"]},
+   {desc:"i=2: arr[2]=2. idx=2. arr[2] itself is being used as BOTH data and index here — arr[2]=-2 after marking",set:{i:"2","arr[i]":"2",idx:"2"},chg:["i","arr[i]","idx"]},
+   {desc:"i=5: arr[5]=2 (a duplicate 2!). idx=2. arr[2] is ALREADY negative (-2) → <span class='exec'>2 reported as duplicate!</span>",set:{i:"5","arr[i]":"2",idx:"2","arr[idx]":"-2 (already marked)"},chg:["i","arr[i]","idx","arr[idx]"]},
+   {desc:"i=6: arr[6]=3 (also a duplicate). idx=3, already marked → <span class='exec'>3 reported too</span>",set:{i:"6","arr[i]":"3",idx:"3"},chg:["i","arr[i]","idx"]}
+  ]
+ },
+ output:[
+  {o:"Array: 4 3 2 7 5 2 3 1"},
+  {o:"Duplicates: 2 3"}
+ ],
+ better:{
+  naive:"A hash-set-based approach would also work but uses O(n) EXTRA space; the index-marking trick uses the input array itself as the marking structure.",
+  improvements:[
+   "<b>The index-marking technique</b> (shown here) is optimal specifically because values are constrained to valid index range — a rare and elegant fit between constraint and technique.",
+   "<b>Restore the array afterward</b> if the original (unnegated) values are needed later — re-negate everything back to positive in a cleanup pass.",
+   "<b>This exact pattern</b> is the standard solution to 'Find All Duplicates in an Array' — a well-known interview problem."
+  ],
+  complexity:["Time: O(n) — single pass","Space: O(1) — reuses the input array itself, no extra structure"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why must values be constrained to range 1..n-1 for this technique to work?",
+   opts:["No real reason","Values are used AS array indices, so they must fit within the array's valid index range","Faster for small values","Required by C syntax"],ans:1,
+   exp:"<b>Index-range constraint.</b> The whole trick depends on treating a value as a position to mark — if values could exceed the array's bounds, you'd index out of range."},
+  {type:"spot-the-bug",q:"Why take the absolute value of arr[i] before using it as an index?",
+   opts:["Unnecessary","The slot might have already been negated by an earlier iteration — need the true magnitude","Speeds up the code","Only matters for negative inputs"],ans:1,
+   exp:"<b>Already-marked values.</b> If a previous iteration negated this exact value elsewhere in the array, reading it directly (without abs) would misinterpret it as a different (negative) index."},
+  {type:"fill-in-the-blank",q:"Finding a position that's already ____ during the marking pass reveals a duplicate value.",
+   answer:"negative",exp:"A negative value at the target index means that position was already visited — signaling the current value is a repeat."}
+ ]
+},
+{
+ id:"pq71", unit:"Unit 3", tab:"Q71 · Magic square",
+ title:"Verifying a magic square",
+ question:"Verify all rows, columns, and diagonals sum to the same value in an n×n matrix.",
+ aim:"Compute one target sum (from the first row), then check every other row, column, and both diagonals against it.",
+ file:"q71.c",
+ syntax:[
+  {tok:"target = first row's sum", why:"The reference value",
+   body:"Rather than checking all sums are equal to EACH OTHER pairwise, pick the first row's sum as the target and check everything else against that single reference.",
+   trap:"If the FIRST row itself is wrong somehow, this method still 'validates' against a wrong target — but since it's derived from the actual data, this isn't really a flaw, just how the check is framed."},
+  {tok:"row/column sum loops", why:"Check every row and column",
+   body:"A loop for rows and a separate loop for columns, each accumulating and comparing to target, covers the grid's full 2D structure.",
+   trap:"Early-return (or break) on the FIRST mismatch found is efficient — no need to check everything if failure is already certain."},
+  {tok:"diagonal sums (both)", why:"Two special sums often forgotten",
+   body:"The main diagonal (top-left to bottom-right) and anti-diagonal (top-right to bottom-left) each need their own explicit sum-and-compare — they're not covered by the row/column loops.",
+   trap:"Forgetting to check BOTH diagonals (only checking one) misses half of what defines a 'magic' square."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> target = mat[<span class="num">0</span>][<span class="num">0</span>]+mat[<span class="num">0</span>][<span class="num">1</span>]+mat[<span class="num">0</span>][<span class="num">2</span>];',note:"Reference sum, taken from the first row.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">3</span>;i++){ ...row sum...; <span class="kw">if</span>(rs!=target) <span class="kw">return</span> <span class="num">0</span>; }',note:"Check every row against the target.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;<span class="num">3</span>;j++){ ...col sum...; <span class="kw">if</span>(cs!=target) <span class="kw">return</span> <span class="num">0</span>; }',note:"Check every column against the target.",hl:true},
+  {t:'<span class="ty">int</span> d1=mat[<span class="num">0</span>][<span class="num">0</span>]+mat[<span class="num">1</span>][<span class="num">1</span>]+mat[<span class="num">2</span>][<span class="num">2</span>];',note:"Main diagonal.",hl:true},
+  {t:'<span class="ty">int</span> d2=mat[<span class="num">0</span>][<span class="num">2</span>]+mat[<span class="num">1</span>][<span class="num">1</span>]+mat[<span class="num">2</span>][<span class="num">0</span>];',note:"Anti-diagonal — easily forgotten!",hl:true},
+  {t:'<span class="kw">if</span>(d1!=target || d2!=target) <span class="kw">return</span> <span class="num">0</span>;'}
+ ],
+ mem:{
+  title:"Verifying the Lo Shu magic square {{2,7,6},{9,5,1},{4,3,8}}",
+  vars:["target","row sums","col sums","d1","d2"],
+  steps:[
+   {desc:"target = 2+7+6 = 15 (from row 0)",set:{target:"15"},chg:["target"]},
+   {desc:"Row 1: 9+5+1=15 ✓. Row 2: 4+3+8=15 ✓. All rows match.",set:{"row sums":"15,15,15"},chg:["row sums"]},
+   {desc:"Col 0: 2+9+4=15 ✓. Col 1: 7+5+3=15 ✓. Col 2: 6+1+8=15 ✓",set:{"col sums":"15,15,15"},chg:["col sums"]},
+   {desc:"d1(main)=2+5+8=15 ✓. d2(anti)=6+5+4=15 ✓. <span class='exec'>All match — VALID magic square!</span>",set:{d1:"15",d2:"15"},chg:["d1","d2"]}
+  ]
+ },
+ output:[
+  {o:"Classic magic square: VALID"},
+  {o:"1-9 sequential grid: invalid"}
+ ],
+ better:{
+  naive:"Hardcoded to 3×3 — extending to general n×n requires parameterizing the size and generalizing the diagonal index calculations.",
+  improvements:[
+   "<b>Generalize to n×n</b> by looping row/column sums with a variable size, and computing diagonals as <code>mat[i][i]</code> and <code>mat[i][n-1-i]</code>.",
+   "<b>Early-exit on first failure</b> (already done via early return) avoids wasted work once a mismatch is found.",
+   "<b>Toroidal magic squares</b> (mentioned in the original question) add wraparound broken-diagonal checks — a genuinely more advanced extension."
+  ],
+  complexity:["Time: O(n²) for an n×n square — every cell is read once across the row/column/diagonal checks","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is the 1-9 sequential grid ({{1,2,3},{4,5,6},{7,8,9}}) a magic square?",
+   opts:["Yes","No — row sums differ (6,15,24)","Only diagonally","Undefined"],ans:1,
+   exp:"<b>No.</b> Row sums are 1+2+3=6, 4+5+6=15, 7+8+9=24 — all different, immediately failing the magic square test."},
+  {type:"spot-the-bug",q:"Why check BOTH d1 (main diagonal) and d2 (anti-diagonal)?",
+   opts:["Redundant, only need one","A magic square requires ALL rows, columns, AND both diagonals to match — missing one diagonal is an incomplete check","Style","Only d1 matters"],ans:1,
+   exp:"<b>Complete definition.</b> The formal definition of a magic square includes both diagonals; checking only one would incorrectly validate some non-magic squares."},
+  {type:"fill-in-the-blank",q:"The reference target sum is typically taken from the ____ row.",
+   answer:"first",exp:"Using the first row's sum as the comparison target is a simple, valid choice — everything else must match it."}
+ ]
+},
+{
+ id:"pq72", unit:"Unit 3", tab:"Q72 · RLE compression",
+ title:"Run-length encoding: compress and decompress",
+ question:"Compress 'AAAABBBCCA' to '4A3B2C1A'; implement the decompressor and verify round-trip correctness.",
+ aim:"Count consecutive repeated characters for compression, then parse count+char pairs to reverse it.",
+ file:"q72.c",
+ syntax:[
+  {tok:"count consecutive same chars", why:"The compression core",
+   body:"An inner while-loop counts how many times the CURRENT character repeats consecutively before moving on — that count plus the character IS the compressed unit.",
+   trap:"Not advancing the outer index past the whole run (using the SAME inner loop's final position) would recount characters already processed."},
+  {tok:"sprintf for building output", why:"Format count+char into the output buffer",
+   body:"<code>sprintf(out+oi, \"%d%c\", cnt, c)</code> writes the digit(s) and character directly into the growing output string, returning how many characters were written (used to advance oi).",
+   trap:"Not capturing sprintf's return value to advance oi would let subsequent writes overwrite the same position."},
+  {tok:"decompress: parse digits then repeat char", why:"Reverse the encoding",
+   body:"Read consecutive digit characters to reconstruct the count (digit by digit, like Q23's number-building pattern), then repeat the following character that many times.",
+   trap:"Not handling MULTI-DIGIT counts (e.g. '12A' for twelve A's) would break on any run longer than 9."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">compress</span>(<span class="ty">const char</span>*s, <span class="ty">char</span>*out){'},
+  {t:'  <span class="ty">int</span> i=<span class="num">0</span>,oi=<span class="num">0</span>;'},
+  {t:'  <span class="kw">while</span>(s[i]){'},
+  {t:'    <span class="ty">char</span> c=s[i]; <span class="ty">int</span> cnt=<span class="num">0</span>;'},
+  {t:'    <span class="kw">while</span>(s[i]==c){ cnt++; i++; }',note:"Count this run of identical characters.",hl:true},
+  {t:'    oi += <span class="fn">sprintf</span>(out+oi, <span class="str">"%d%c"</span>, cnt, c);',note:"Write count+char, advance oi by however many chars were written.",hl:true},
+  {t:'  }'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">decompress</span>(<span class="ty">const char</span>*s, <span class="ty">char</span>*out){'},
+  {t:'  <span class="kw">while</span>(s[i]){'},
+  {t:'    <span class="ty">int</span> cnt=<span class="num">0</span>; <span class="kw">while</span>(s[i]&gt;=<span class="str">\'0\'</span>&amp;&amp;s[i]&lt;=<span class="str">\'9\'</span>){ cnt=cnt*<span class="num">10</span>+(s[i]-<span class="str">\'0\'</span>); i++; }',note:"Parse potentially MULTI-digit count.",hl:true},
+  {t:'    <span class="ty">char</span> c=s[i++];'},
+  {t:'    <span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;cnt;k++) out[oi++]=c;',note:"Repeat the character cnt times."},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Compressing \"AAAABBBCCA\"",
+  vars:["current char","run count","output so far"],
+  steps:[
+   {desc:"c='A', count consecutive A's: 4. Write '4A'",set:{"current char":"A","run count":"4","output so far":"4A"},chg:["current char","run count","output so far"]},
+   {desc:"c='B', count: 3. Write '3B'",set:{"current char":"B","run count":"3","output so far":"4A3B"},chg:["current char","run count","output so far"]},
+   {desc:"c='C', count: 2. Write '2C'",set:{"current char":"C","run count":"2","output so far":"4A3B2C"},chg:["current char","run count","output so far"]},
+   {desc:"c='A' (a NEW run, not merged with the earlier A's!), count: 1. <span class='exec'>Final: 4A3B2C1A</span>",set:{"current char":"A","run count":"1","output so far":"4A3B2C1A"},chg:["current char","run count","output so far"]}
+  ]
+ },
+ output:[
+  {o:"Original: AAAABBBCCA"},
+  {o:"Compressed: 4A3B2C1A"},
+  {o:"Decompressed: AAAABBBCCA"},
+  {o:"Round-trip match: YES"}
+ ],
+ better:{
+  naive:"Works correctly, but RLE only compresses well when there ARE long runs — random or non-repetitive text can actually EXPAND under this scheme (e.g. 'ABCD' becomes '1A1B1C1D', doubling in size).",
+  improvements:[
+   "<b>Skip encoding runs of length 1</b> (just output the raw character) to avoid the pathological expansion case for non-repetitive data.",
+   "<b>Validate round-trip</b> (as done here) is a good habit for ANY compression scheme — always verify decompress(compress(x))==x.",
+   "<b>RLE is genuinely used in practice</b> for specific formats (like simple image formats with large flat color areas) where the run-length assumption actually holds."
+  ],
+  complexity:["Compress: O(n) in input length","Decompress: O(m) in compressed length (which expands back to O(n) output writes)","Space: O(n) for output buffers"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Compressing \"AAAABBBCCA\" produces what exact string?",
+   opts:["4A3B3C","4A3B2C1A","10A","AAAABBBCCA"],ans:1,
+   exp:"<b>4A3B2C1A.</b> Note the final 'A' is a SEPARATE run (count 1) from the initial 4 A's, since 2 C's come between them."},
+  {type:"spot-the-bug",q:"Why must decompress parse MULTIPLE digit characters for the count, not just one?",
+   opts:["Unnecessary, counts are always single-digit","Runs can be 10 or more characters long, requiring multi-digit counts like '12A'","Style","Faster with single digit"],ans:1,
+   exp:"<b>Multi-digit runs.</b> A run of 12 identical characters compresses to '12A' — parsing only one digit would misread this as count=1, char='2', leaving 'A' unconsumed and corrupting the rest of the parse."},
+  {type:"fill-in-the-blank",q:"RLE compression can actually ____ the size of non-repetitive data instead of shrinking it.",
+   answer:"increase",exp:"Each single, non-repeated character becomes 2 characters ('1X'), doubling the size for maximally non-repetitive input."}
+ ]
+},
+{
+ id:"pq73", unit:"Unit 3", tab:"Q73 · Move-to-front search",
+ title:"Linear search with move-to-front heuristic",
+ question:"Implement linear search, then add a move-to-front strategy that improves repeated lookups.",
+ aim:"After finding a target, swap it one step closer to the front, so future searches for it are faster.",
+ file:"q73.c",
+ syntax:[
+  {tok:"standard linear scan", why:"Find the target's index",
+   body:"A simple loop checking each element in turn until a match is found — the baseline O(n) search everyone learns first.",
+   trap:"Forgetting to handle the 'not found' case (looping off the end) leaves the function's behavior undefined for missing targets."},
+  {tok:"swap toward front on find", why:"Adaptive optimization",
+   body:"Once found at index i, swapping it with the element at i-1 moves it one step closer to the front — frequently-searched items gradually migrate toward the fast end of the array.",
+   trap:"Moving it ALL the way to index 0 (instead of just one step) is a more aggressive variant with different tradeoffs — both are valid 'move-to-front' strategies, just different intensities."},
+  {tok:"amortized benefit over repeated searches", why:"Why this helps in practice",
+   body:"A single search isn't faster, but if the SAME few items are searched repeatedly (a common real-world access pattern), they migrate toward the front, reducing average search time over many calls.",
+   trap:"For uniformly random access patterns (no hot items), this heuristic provides no benefit and adds slight overhead — it specifically helps skewed/repeated access patterns."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">linearSearchMTF</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n,<span class="ty">int</span> target){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++){'},
+  {t:'    <span class="kw">if</span>(arr[i]==target){'},
+  {t:'      <span class="kw">if</span>(i&gt;<span class="num">0</span>){ ...swap arr[i],arr[i-1]...; }',note:"Move the found element ONE step closer to the front.",hl:true},
+  {t:'      <span class="kw">return</span> (i&gt;<span class="num">0</span>)?i-<span class="num">1</span>:i;',note:"Report its NEW (post-swap) position."},
+  {t:'    }'},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> -<span class="num">1</span>;',note:"Not found."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Searching for 9 twice in [5,3,8,1,9,2]",
+  vars:["array","found at","search cost"],
+  steps:[
+   {desc:"First search for 9: scans index 0,1,2,3,4 — found at index 4",set:{array:"5,3,8,1,9,2","found at":"4","search cost":"5 comparisons"},chg:["array","found at","search cost"]},
+   {desc:"Swap with index 3: array becomes [5,3,8,9,1,2]. 9 is now one step closer to front.",set:{array:"5,3,8,9,1,2"},chg:["array"]},
+   {desc:"Second search for 9: scans 0,1,2,3 — <span class='exec'>found at index 3 (faster: only 4 comparisons)</span>",set:{"found at":"3","search cost":"4 comparisons"},chg:["found at","search cost"]}
+  ]
+ },
+ output:[
+  {o:"Before: 5 3 8 1 9 2"},
+  {o:"Find 9: index 3"},
+  {o:"After (9 moved closer to front): 5 3 8 9 1 2"},
+  {o:"Find 9 again: index 2 (faster this time)"}
+ ],
+ better:{
+  naive:"For a UNIFORM random access pattern (every element equally likely to be searched), move-to-front provides no real average-case benefit and adds minor overhead from the swaps.",
+  improvements:[
+   "<b>This heuristic shines specifically for skewed access patterns</b> (some elements searched much more often than others) — like a cache's LRU-ish behavior.",
+   "<b>An alternative: move all the way to front</b> (not just one step) reacts faster to hot items but does more work per swap — a genuine tradeoff to consider.",
+   "<b>For genuinely large, frequently-searched datasets</b>, a hash table (O(1) average lookup) beats any linear-search variant — MTF is an incremental improvement, not a asymptotic one."
+  ],
+  complexity:["Time: O(n) worst case per search (same as plain linear search)","Space: O(1) extra — just the one swap"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After finding an element at index 4 and moving it toward the front once, what's its new index?",
+   opts:["0","3","4 (unchanged)","5"],ans:1,
+   exp:"<b>3.</b> Move-to-front (one-step version) swaps it with its immediate predecessor, moving it exactly one position closer to index 0."},
+  {type:"spot-the-bug",q:"Does move-to-front make a SINGLE search faster?",
+   opts:["Yes, always","No — the current search still takes O(n) worst case; only FUTURE searches for the same item benefit","It makes it slower always","Only for sorted arrays"],ans:1,
+   exp:"<b>No immediate benefit.</b> The search that TRIGGERS the move still has to scan up to the found position; the payoff is entirely in reduced cost for subsequent searches of that same value."},
+  {type:"fill-in-the-blank",q:"Move-to-front heuristics provide the most benefit when access patterns are ____ (some items searched much more than others).",
+   answer:"skewed",exp:"Uniform random access gains nothing; skewed/repeated access to a few 'hot' items is where this heuristic actually pays off."}
+ ]
+},
+{
+ id:"pq74", unit:"Unit 3", tab:"Q74 · Balanced brackets",
+ title:"Balanced parentheses, then multiple bracket types",
+ question:"Check balanced parentheses with a counter; extend to {, }, [, ] using an actual stack.",
+ aim:"Start with a simple counter for one bracket type, then generalize to a real stack for multiple types.",
+ file:"q74.c",
+ syntax:[
+  {tok:"counter as implicit stack (single type)", why:"Simplest possible balance check",
+   body:"For ONLY parentheses, a simple integer counter works: +1 on '(', -1 on ')'. If it ever goes negative, there's an unmatched close; if it's not exactly 0 at the end, there's an unmatched open.",
+   trap:"This counter trick ONLY works for a single bracket type — it can't detect ORDER violations between different types, like <code>{[(]})</code>."},
+  {tok:"real stack for multiple types", why:"Order matters across types",
+   body:"Pushing each open bracket and popping on each close lets you verify the POPPED bracket actually matches the current close bracket — catching interleaving errors the simple counter can't.",
+   trap:"Popping without checking if the stack is empty first (on an unexpected close bracket) would read invalid/garbage stack data."},
+  {tok:"final check: stack must be empty", why:"All opens must be matched",
+   body:"After processing the whole string, if the stack isn't empty, some open brackets were never closed — an unbalanced string.",
+   trap:"Only checking DURING the scan (not after) misses the case where the string ends with unclosed brackets still on the stack."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">isBalancedSimple</span>(<span class="ty">const char</span>*s){'},
+  {t:'  <span class="ty">int</span> count=<span class="num">0</span>;'},
+  {t:'  <span class="kw">for</span>(...){ <span class="kw">if</span>(s[i]==<span class="str">\'(\'</span>) count++; <span class="kw">else if</span>(s[i]==<span class="str">\')\'</span>){ count--; <span class="kw">if</span>(count&lt;<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>; } }',note:"A single counter suffices for ONE bracket type.",hl:true},
+  {t:'  <span class="kw">return</span> count==<span class="num">0</span>;'},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">isBalancedMulti</span>(<span class="ty">const char</span>*s){'},
+  {t:'  <span class="ty">char</span> stack[<span class="num">100</span>]; <span class="ty">int</span> top=-<span class="num">1</span>;'},
+  {t:'  <span class="kw">for</span>(...){'},
+  {t:'    <span class="kw">if</span>(c==<span class="str">\'(\'</span>||c==<span class="str">\'{\'</span>||c==<span class="str">\'[\'</span>) stack[++top]=c;',note:"Push any open bracket.",hl:true},
+  {t:'    <span class="kw">else if</span>(...close bracket...){'},
+  {t:'      <span class="kw">if</span>(top&lt;<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;',note:"Nothing to match — unbalanced."},
+  {t:'      <span class="ty">char</span> open=stack[top--];',note:"Pop and check it matches THIS close bracket type."},
+  {t:'      <span class="kw">if</span>(mismatch) <span class="kw">return</span> <span class="num">0</span>;',note:"Wrong type popped — order violation detected!",hl:true},
+  {t:'    }'},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> top==-<span class="num">1</span>;',note:"Stack must be fully empty at the end."}
+ ],
+ mem:{
+  title:"Checking '{[(])}' — a classic mismatched case",
+  vars:["char","stack (top→bottom)","match?"],
+  steps:[
+   {desc:"'{' pushed. stack=['{']",set:{"char":"{","stack (top→bottom)":"{"},chg:["char","stack (top→bottom)"]},
+   {desc:"'[' pushed. stack=['{','[']",set:{"char":"[","stack (top→bottom)":"[,{"},chg:["char","stack (top→bottom)"]},
+   {desc:"'(' pushed. stack=['{','[','(']",set:{"char":"(","stack (top→bottom)":"(,[,{"},chg:["char","stack (top→bottom)"]},
+   {desc:"']' seen. Pop top='(' — but ']' needs '[' ! <span class='exec'>MISMATCH — not balanced</span>",set:{"char":"]","match?":"NO — expected [ but got ("},chg:["char","match?"]}
+  ]
+ },
+ output:[
+  {o:"'(()())' simple: balanced"},
+  {o:"'(()' simple: not balanced"},
+  {o:"'{[()]}' multi: balanced"},
+  {o:"'{[(])}' multi: not balanced"}
+ ],
+ better:{
+  naive:"The simple counter is elegant but strictly limited to ONE bracket type — trying to extend it to multiple types by just tracking separate counters would miss ORDER violations entirely.",
+  improvements:[
+   "<b>The stack-based approach is necessary</b> (not just nicer) for multiple bracket types — a counter fundamentally cannot detect interleaving errors like {[(])}.",
+   "<b>Bound the stack size</b> or use dynamic allocation if input strings could be arbitrarily long (avoiding a fixed 100-char limit).",
+   "<b>This exact pattern</b> is the standard technique behind syntax checkers, JSON/XML validators, and compiler parenthesis matching."
+  ],
+  complexity:["Simple counter: O(n) time, O(1) space","Stack-based: O(n) time, O(n) space (worst case: all opens, no closes)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is '(()' balanced by the simple counter method?",
+   opts:["Yes","No — count ends at 1, not 0","No — count goes negative","Undefined"],ans:1,
+   exp:"<b>No.</b> Two '(' increment count to 2, one ')' decrements to 1 — ending at 1 (not 0) means an unclosed '(' remains."},
+  {type:"spot-the-bug",q:"Why can't a simple counter (like the single-bracket-type version) handle multiple bracket types correctly?",
+   opts:["It can, just use 3 counters","Separate counters can't detect ORDER/interleaving violations between different types","Too slow","No real limitation"],ans:1,
+   exp:"<b>Order blindness.</b> Even with 3 separate counters (one per type), you could never detect that '{[(])}' has its brackets in the WRONG order — only a stack (which cares about sequence) catches that."},
+  {type:"fill-in-the-blank",q:"After scanning the whole string, a properly balanced multi-type expression must leave the stack completely ____.",
+   answer:"empty",exp:"An empty stack (top==-1) means every opened bracket found its matching close, in the correct order."}
+ ]
+},
+{
+ id:"pq75", unit:"Unit 3", tab:"Q75 · Intersection & union",
+ title:"Array intersection and union without sorting",
+ question:"Find intersection and union of two unsorted integer arrays without sorting. Analyze and propose a faster approach.",
+ aim:"Use a linear 'contains' helper for both operations, then reason about the complexity tradeoff vs a hash-based approach.",
+ file:"q75.c",
+ syntax:[
+  {tok:"contains() linear helper", why:"Check membership without sorting",
+   body:"A simple loop checking every element of one array against a target value — the basic building block for both intersection and union here.",
+   trap:"Calling this inside another loop (as done for both intersection and union) creates an O(n×m) nested cost — fine for small arrays, not for large ones."},
+  {tok:"intersection: keep if in both", why:"Elements common to both arrays",
+   body:"For each element of array A, check if it also appears in B — if so, it's part of the intersection.",
+   trap:"Not deduplicating means repeated values in A would each independently pass the contains(B) check, printing duplicates in the intersection output."},
+  {tok:"union: all of A, plus B's uniques", why:"Elements appearing in either array",
+   body:"Print all of A first, then scan B and print only the elements NOT already in A — avoiding duplicate printing of shared elements.",
+   trap:"Printing all of both arrays without the 'not already in A' check would duplicate every shared element in the union output."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">contains</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n,<span class="ty">int</span> v){ <span class="kw">for</span>(...) <span class="kw">if</span>(arr[i]==v) <span class="kw">return</span> <span class="num">1</span>; <span class="kw">return</span> <span class="num">0</span>; }',note:"Simple O(n) linear membership check.",hl:true},
+  {t:'<span class="cm">// Intersection: keep A\'s elements that also appear in B</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;an;i++) <span class="kw">if</span>(<span class="fn">contains</span>(b,bn,a[i])) <span class="fn">printf</span>(<span class="str">"%d "</span>,a[i]);'},
+  {t:'<span class="cm">// Union: all of A, plus B\'s elements not already in A</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;an;i++) <span class="fn">printf</span>(<span class="str">"%d "</span>,a[i]);'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;bn;i++) <span class="kw">if</span>(!<span class="fn">contains</span>(a,an,b[i])) <span class="fn">printf</span>(<span class="str">"%d "</span>,b[i]);',note:"Avoid double-printing shared elements.",hl:true}
+ ],
+ mem:{
+  title:"A=[1,2,3,4,5], B=[3,4,5,6,7]",
+  vars:["a[i]","in B?","result"],
+  steps:[
+   {desc:"a[0]=1: contains(B,1)? No.",set:{"a[i]":"1","in B?":"no"},chg:["a[i]","in B?"]},
+   {desc:"a[2]=3: contains(B,3)? Yes! → part of intersection",set:{"a[i]":"3","in B?":"yes",result:"3"},chg:["a[i]","in B?","result"]},
+   {desc:"a[3]=4, a[4]=5: also in B → intersection grows to {3,4,5}",set:{result:"3,4,5"},chg:["result"]},
+   {desc:"Union: all of A (1,2,3,4,5) plus B's uniques (6,7 — since 3,4,5 already printed) → <span class='exec'>1,2,3,4,5,6,7</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Intersection: 3 4 5"},
+  {o:"Union: 1 2 3 4 5 6 7"},
+  {o:"Time complexity: O(n*m) with linear contains(); O(n+m) achievable with a hash set."}
+ ],
+ better:{
+  naive:"The nested linear-scan approach is O(n×m) — for two arrays of size 1000 each, that's a million comparisons for something that could be done in a few thousand.",
+  improvements:[
+   "<b>Use a hash set</b> (conceptually — C doesn't have one built in, but a simple hash table or even a boolean-indexed array for bounded value ranges) to reduce membership checks to O(1) average, bringing total complexity to O(n+m).",
+   "<b>If sorting IS allowed</b> (the question specifically restricts it, but worth knowing), sorting both arrays first enables an O((n+m)log(n+m)) merge-based intersection/union — sometimes simpler to implement correctly than a hash table.",
+   "<b>Deduplicate within each array first</b> if inputs might contain internal duplicates, to avoid repeated output entries."
+  ],
+  complexity:["Current (linear contains): O(n×m)","With a hash set: O(n+m)","Space: O(1) current / O(n) with a hash set"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For A={1,2,3,4,5} and B={3,4,5,6,7}, what's the intersection?",
+   opts:["{1,2,6,7}","{3,4,5}","{1,2,3,4,5,6,7}","{}"],ans:1,
+   exp:"<b>{3,4,5}.</b> These are exactly the values present in BOTH arrays."},
+  {type:"spot-the-bug",q:"What is the actual time complexity of this intersection/union approach as written?",
+   opts:["O(n+m)","O(n×m) — nested linear scans","O(log n)","O(1)"],ans:1,
+   exp:"<b>O(n×m).</b> For each of A's n elements, contains() does an O(m) linear scan through B — giving O(n×m) total, not the optimal O(n+m)."},
+  {type:"fill-in-the-blank",q:"Using a hash set instead of linear contains() would improve the complexity to O(____).",
+   answer:"n+m",exp:"With O(1) average-case hash lookups, the total work becomes linear in the combined size of both arrays."}
+ ]
+}
+);
 
 </script>
 <script>
 /* ================= C-LAB APP ================= */
-const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: [], 4: [], 5: [] };
+const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: (typeof PRACTICE_U3!=='undefined'?PRACTICE_U3:[]), 4: [], 5: [] };
 const UNIT_RANGES = {1:"1–25",2:"26–50",3:"51–75",4:"76–100",5:"101–125"};
 
 const state = { mode:'lab', unit:1, active:0, done:new Set(), quizScore:0, quizMax:0, quizAnswered:new Set() };
