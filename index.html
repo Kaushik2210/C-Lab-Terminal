@@ -2244,11 +2244,1490 @@ PRACTICE_U1.push(
  ]
 }
 );
+/* ===== PRACTICE QUESTIONS — UNIT 2 (Q26–38) ===== */
+const PRACTICE_U2 = [
+{
+ id:"pq26", unit:"Unit 2", tab:"Q26 · Mutating bound",
+ title:"Modifying the loop bound mid-loop",
+ question:"<code>for(i=0;i&lt;n;i++)</code> but n is modified inside the body. Does it terminate? Is it defined?",
+ aim:"See that the condition re-reads n every iteration — shrinking n cuts the loop short, safely but surprisingly.",
+ file:"q26.c",
+ syntax:[
+  {tok:"for(i=0;i<n;i++)", why:"Condition re-evaluated every pass",
+   body:"<code>i&lt;n</code> is checked fresh before each iteration. If n shrinks inside the body, the very next check sees the new n.",
+   trap:"Assuming the loop 'locked in' n's original value at the start — it didn't; there's no snapshot unless you make one."},
+  {tok:"is it defined?", why:"Yes — just surprising",
+   body:"This is fully defined behaviour, not UB. The loop reads n's current value each time, so shrinking it deterministically shortens the loop.",
+   trap:"Confusing 'surprising' with 'undefined' — the C standard is completely clear about this case."},
+  {tok:"snapshot pattern", why:"The fix when you don't want this",
+   body:"Copy n into a <code>const</code>/separate variable before the loop and iterate against that, so later changes to n don't affect iteration count.",
+   trap:"Modifying the loop variable itself (not the bound) is a different, also-common bug."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> n=<span class="num">5</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++){',note:"n is re-read fresh on every check.",hl:true},
+  {t:'  <span class="fn">printf</span>(<span class="str">"i=%d n=%d\\n"</span>,i,n);'},
+  {t:'  <span class="kw">if</span>(i==<span class="num">2</span>) n=<span class="num">2</span>;',note:"Shrinks n mid-loop — next check sees n=2, so i=3 fails i<n and the loop stops.",hl:true},
+  {t:'}'},
+  {t:'<span class="fn">printf</span>(<span class="str">"Final n=%d\\n"</span>, n);'}
+ ],
+ mem:{
+  title:"n shrinks from 5 to 2 at i==2",
+  vars:["i","n","condition i<n"],
+  steps:[
+   {desc:"i=0, n=5: 0<5 true, runs.",set:{i:"0",n:"5","condition i<n":"true"},chg:["i","n","condition i<n"]},
+   {desc:"i=1, n=5: 1<5 true, runs.",set:{i:"1"},chg:["i"]},
+   {desc:"i=2, n=5: 2<5 true, runs. Body sets <span class='exec'>n=2</span>.",set:{i:"2",n:"2"},chg:["i","n"]},
+   {desc:"i becomes 3. Check: 3<2 → <span class='exec'>false — loop stops!</span>",set:{i:"3","condition i<n":"false"},chg:["i","condition i<n"]}
+  ]
+ },
+ output:[
+  {o:"n starts at 5"},{o:"i=0 n=5"},{o:"i=1 n=5"},{o:"i=2 n=5"},
+  {o:"Loop terminated. Final n=2"}
+ ],
+ better:{
+  naive:"Letting a shared bound variable be both the loop limit AND something the body freely edits invites exactly this confusion.",
+  improvements:[
+   "<b>Snapshot the bound</b>: <code>int limit=n; for(i=0;i&lt;limit;i++)</code> so body edits to n don't affect iteration.",
+   "<b>If you DO want dynamic bounds</b> (rare, valid use case: processing a shrinking queue), document it explicitly with a comment.",
+   "<b>Prefer a separate variable</b> for anything the loop body needs to mutate, keeping the loop's control variable untouched."
+  ],
+  complexity:["Time: depends on final n, not original — that's the whole point","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After the body sets n=2 while i=2, what is the last value of i printed inside the loop?",
+   opts:["4","2","3","5"],ans:1,exp:"<b>2.</b> After n becomes 2, i increments to 3; 3<2 is false so the loop exits before printing i=3."},
+  {type:"spot-the-bug",q:"Is modifying n inside the loop undefined behaviour?",
+   opts:["Yes, always UB","No — fully defined, just easy to misread","Only for floats","Only in for loops"],ans:1,
+   exp:"<b>No, it's defined.</b> The condition re-reads n's current value every pass. It's a legitimate (if surprising) pattern, not UB."},
+  {type:"fill-in-the-blank",q:"To make the loop immune to body-side changes to n, take a ____ of n before the loop.",
+   answer:"snapshot",exp:"Copying n into a separate variable before the loop locks in the original bound."}
+ ]
+},
+{
+ id:"pq27", unit:"Unit 2", tab:"Q27 · Pythagorean O(n²)",
+ title:"Pythagorean triples: O(n³) → O(n²)",
+ question:"Print all Pythagorean triples with c≤100. Optimize from O(n³) to O(n²) and measure the difference.",
+ aim:"Drop the innermost search loop by computing c directly from a² + b² via sqrt.",
+ file:"q27.c",
+ syntax:[
+  {tok:"naive O(n³)", why:"Triple nested loop",
+   body:"The obvious approach loops a, b, AND c, checking <code>a*a+b*b==c*c</code> for every combination — cubic in the limit.",
+   trap:"This is the default instinct, and it's needlessly slow once the limit grows."},
+  {tok:"sqrt(a*a+b*b)", why:"Compute c directly",
+   body:"Instead of searching for c, compute it: <code>c = round(sqrt(a²+b²))</code>, then verify <code>c*c == a²+b²</code> to rule out rounding false positives.",
+   trap:"Skipping the verification step lets floating-point rounding produce false 'triples'."},
+  {tok:"b starts at a", why:"Avoid duplicate/mirror pairs",
+   body:"Looping <code>b</code> from <code>a</code> (not 1) skips checking (4,3,5) after already finding (3,4,5).",
+   trap:"Starting b from 1 doubles the work checking mirror image pairs."}
+ ],
+ code:[
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> a=<span class="num">1</span>;a&lt;=LIMIT;a++){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> b=a;b&lt;=LIMIT;b++){',note:"b starts at a — avoids duplicate mirror pairs. Only 2 nested loops now.",hl:true},
+  {t:'    <span class="ty">int</span> csq=a*a+b*b;'},
+  {t:'    <span class="ty">int</span> c=(<span class="ty">int</span>)round(sqrt((<span class="ty">double</span>)csq));',note:"Compute c directly instead of searching for it — drops the third loop.",hl:true},
+  {t:'    <span class="kw">if</span>(c&lt;=LIMIT &amp;&amp; c*c==csq){ <span class="fn">printf</span>(<span class="str">"(%d,%d,%d) "</span>,a,b,c); count++; }',note:"Verify c*c==csq to rule out float rounding errors.",hl:true},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Scanning a,b up to 20",
+  vars:["a","b","csq","c","valid?"],
+  steps:[
+   {desc:"a=3, b=4: csq=9+16=25",set:{a:"3",b:"4",csq:"25"},chg:["a","b","csq"]},
+   {desc:"c = round(sqrt(25)) = 5",set:{c:"5"},chg:["c"]},
+   {desc:"Verify: 5*5==25 → <span class='exec'>valid triple (3,4,5)</span>",set:{"valid?":"yes"},chg:["valid?"]},
+   {desc:"...continues scanning; finds (5,12,13),(6,8,10),(8,15,17),(9,12,15),(12,16,20)",set:{},chg:[]}
+  ]
+ },
+ output:[{o:"Pythagorean triples with c<=20 (O(n^2)):"},{o:"(3,4,5) (5,12,13) (6,8,10) (8,15,17) (9,12,15) (12,16,20)"},{o:"Found 6 triples."}],
+ better:{
+  naive:"The O(n³) triple-loop version checks LIMIT³ combinations — at LIMIT=1000 that's a billion checks vs a million.",
+  improvements:[
+   "<b>O(n²) via direct computation</b> turns a search into a formula — the single biggest win here.",
+   "<b>Skip non-primitive triples</b> (multiples of smaller ones) if you only want the 'fundamental' set — further reduces output.",
+   "<b>Use integer-only sqrt</b> (Newton's method or a lookup) to avoid floating-point edge cases entirely for very large limits."
+  ],
+  complexity:["Naive: O(n³)","Optimized: O(n²)","Space: O(1) (or O(k) to store k triples found)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why loop b starting from a instead of 1?",
+   opts:["Faster memory","Avoids re-finding mirror pairs like (4,3,5) after (3,4,5)","Required by C","No reason"],ans:1,
+   exp:"<b>Avoids duplicates.</b> (3,4,5) and (4,3,5) are the same triple; starting b at a skips the redundant mirror."},
+  {type:"spot-the-bug",q:"Why verify <code>c*c==csq</code> after computing c via sqrt?",
+   opts:["Unnecessary","Floating-point sqrt can round to a non-exact integer","To slow it down","Style"],ans:1,
+   exp:"<b>Rounding safety.</b> <code>sqrt</code> returns a double; rounding it to int could be off-by-one for edge values, so verify exactly."},
+  {type:"fill-in-the-blank",q:"Dropping the innermost search loop takes the algorithm from O(n³) to O(n____).",
+   answer:"2",exp:"Two nested loops (a,b) with direct computation of c is O(n²)."}
+ ]
+},
+{
+ id:"pq28", unit:"Unit 2", tab:"Q28 · Bank menu",
+ title:"Menu-driven bank simulation",
+ question:"Deposit, withdraw, balance, last-5-transactions menu with switch-case; lock after 3 wrong PINs.",
+ aim:"Combine a validation loop, a do-while menu loop, and a circular history buffer.",
+ file:"q28.c",
+ syntax:[
+  {tok:"PIN retry loop", why:"Bounded attempts",
+   body:"A <code>while(tin!=pin && tries&lt;3)</code> loop keeps prompting until either the PIN matches or 3 attempts are used — classic lockout logic.",
+   trap:"Forgetting to re-check <code>tin!=pin</code> after the final attempt lets a correct 3rd try still get locked out."},
+  {tok:"do-while menu", why:"Runs at least once",
+   body:"The menu must show at least once before there's anything to check — a textbook case for <code>do-while</code> over <code>while</code>.",
+   trap:"Using <code>while</code> here means writing the menu print twice (once before the loop, once inside)."},
+  {tok:"history[histCount++%5]", why:"Circular buffer of last 5",
+   body:"The modulo wraps the index every 5 entries, so old transactions are silently overwritten by new ones — a ring buffer.",
+   trap:"Without the <code>%5</code>, histCount would run past the array bounds after the 5th transaction."}
+ ],
+ code:[
+  {t:'<span class="kw">while</span>(tin!=pin &amp;&amp; tries&lt;<span class="num">3</span>){',note:"Retry loop: stop on correct PIN OR after 3 tries.",hl:true},
+  {t:'  tries++; <span class="fn">scanf</span>(<span class="str">"%d"</span>,&amp;tin);'},
+  {t:'}'},
+  {t:'<span class="kw">if</span>(tries&gt;=<span class="num">3</span> &amp;&amp; tin!=pin){ <span class="fn">printf</span>(<span class="str">"Locked!\\n"</span>); <span class="kw">return</span> <span class="num">1</span>; }',note:"Only lock if STILL wrong after 3 tries.",hl:true},
+  {t:'<span class="kw">do</span>{',note:"do-while: menu shows at least once.",hl:true},
+  {t:'  <span class="fn">scanf</span>(<span class="str">"%d"</span>,&amp;choice);'},
+  {t:'  <span class="kw">switch</span>(choice){'},
+  {t:'    <span class="kw">case</span> <span class="num">1</span>: ... history[histCount++%<span class="num">5</span>]=amt; <span class="kw">break</span>;',note:"Circular buffer: wraps every 5 entries.",hl:true},
+  {t:'  }'},
+  {t:'} <span class="kw">while</span>(choice!=<span class="num">5</span>);'}
+ ],
+ mem:{
+  title:"Correct PIN first try, deposit 500",
+  vars:["tries","tin","balance","histCount"],
+  steps:[
+   {desc:"tin entered = 1234 = pin → loop body never runs (condition false immediately)",set:{tries:"0",tin:"1234"},chg:["tries","tin"]},
+   {desc:"Access granted. Menu shows (do-while).",set:{},chg:[]},
+   {desc:"Choice 1 (deposit) 500: <span class='exec'>balance = 1000+500 = 1500</span>",set:{balance:"1500",histCount:"1"},chg:["balance","histCount"]}
+  ]
+ },
+ output:[
+  {p:"Enter PIN: ",i:"1234"},
+  {o:"Access granted."},
+  {p:"Choice: ",i:"3"},{o:"Balance: 1000.00"},
+  {p:"Choice: ",i:"1"},{p:"Amount: ",i:"500"},{o:"Deposited 500.00"},
+  {p:"Choice: ",i:"3"},{o:"Balance: 1500.00"},
+  {p:"Choice: ",i:"5"},{o:"Goodbye."}
+ ],
+ better:{
+  naive:"Balance and PIN live only in local variables — nothing persists between runs, and there's no protection against negative deposits.",
+  improvements:[
+   "<b>Persist state to a file</b> (Unit 5 territory) so balance survives across program runs.",
+   "<b>Validate deposit/withdraw amounts</b> are positive before applying them.",
+   "<b>Hash the PIN</b> rather than comparing plaintext, even in a teaching example, to build good habits early."
+  ],
+  complexity:["Time: O(1) per menu action","Space: O(1) — fixed-size history buffer"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why use <code>do-while</code> for the menu instead of <code>while</code>?",
+   opts:["Faster","The menu must display at least once before any check makes sense","Syntax requirement","No difference"],ans:1,
+   exp:"<b>Runs-at-least-once semantics.</b> There's nothing to check before the first menu display, so do-while avoids duplicating the print."},
+  {type:"spot-the-bug",q:"What does <code>history[histCount++%5]</code> achieve?",
+   opts:["Random storage","A circular buffer that wraps every 5 transactions","Sorts transactions","Deletes old data"],ans:1,
+   exp:"<b>Circular buffer.</b> The modulo wraps the storage index every 5 entries, so only the latest 5 transactions are kept."},
+  {type:"fill-in-the-blank",q:"After 3 wrong PIN attempts, the account should ____.",
+   answer:"lock",exp:"The retry loop caps attempts at 3; exceeding it locks the account."}
+ ]
+},
+{
+ id:"pq29", unit:"Unit 2", tab:"Q29 · Loop equivalence",
+ title:"while(1){if(cond)break;} vs while(!cond)",
+ question:"Are these always equivalent? Construct a case where they differ.",
+ aim:"See that they match for simple conditions but diverge when the condition depends on work done inside the body.",
+ file:"q29.c",
+ syntax:[
+  {tok:"while(1){if(cond)break;}", why:"Check happens mid-body",
+   body:"The condition is tested <i>after</i> whatever code precedes the check inside the loop — useful when you must do some work before you can even evaluate the condition.",
+   trap:"Assuming this always matches a plain while — it doesn't when there's meaningful work before the break check."},
+  {tok:"while(!cond){...}", why:"Check happens before every iteration",
+   body:"The condition is evaluated fully before the body ever runs. If computing the condition requires side effects from the body, this form can't express that.",
+   trap:"Using this form when you actually need one guaranteed pass regardless of the initial condition."},
+  {tok:"when they diverge", why:"First-iteration-must-run cases",
+   body:"They differ when the very first iteration must run unconditionally to produce the data the condition depends on — e.g. reading a value, then deciding whether to continue.",
+   trap:"This is exactly why <code>do-while</code> exists — it's the cleanest way to express 'run once, then check'."}
+ ],
+ code:[
+  {t:'<span class="kw">while</span>(<span class="num">1</span>){',note:"Version A: infinite loop with an internal break.",hl:true},
+  {t:'  <span class="kw">if</span>(x&lt;=<span class="num">0</span>) <span class="kw">break</span>;'},
+  {t:'  x--; count1++;'},
+  {t:'}'},
+  {t:'<span class="kw">while</span>(!(x&lt;=<span class="num">0</span>)){',note:"Version B: condition checked up front each time.",hl:true},
+  {t:'  x--; count2++;'},
+  {t:'}'},
+  {t:'<span class="cm">// Same result here because the condition doesn\'t depend on body side effects</span>',hl:true}
+ ],
+ mem:{
+  title:"Both versions with x=5",
+  vars:["x (A)","count1","x (B)","count2"],
+  steps:[
+   {desc:"Version A: x=5→0, decrementing 5 times before x<=0 triggers break",set:{"x (A)":"0",count1:"5"},chg:["x (A)","count1"]},
+   {desc:"Version B: same condition, same result — x=5→0, 5 iterations",set:{"x (B)":"0",count2:"5"},chg:["x (B)","count2"]},
+   {desc:"count1 == count2 == 5 — <span class='exec'>identical here</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"count1=5 count2=5 (same result here)"},
+  {o:"They differ when the loop must run its FIRST iteration unconditionally"},
+  {o:"before the condition is even meaningful."}
+ ],
+ better:{
+  naive:"Treating these two forms as universally interchangeable misses the one case where they aren't.",
+  improvements:[
+   "<b>Use <code>do-while</code></b> explicitly for 'must run once first' logic instead of faking it with <code>while(1)+break</code>.",
+   "<b>Reserve <code>while(1)+break</code></b> for genuinely complex exit conditions (multiple break points) rather than simple ones better expressed directly.",
+   "<b>Name the intent</b>: if a reviewer has to think hard about which form you meant, a comment or do-while clarifies it instantly."
+  ],
+  complexity:["Time: O(1) — this question is about semantics, not scale","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For this specific x=5 example, do the two loop forms produce the same count?",
+   opts:["No","Yes — 5 and 5","Only for even x","Undefined"],ans:1,
+   exp:"<b>Yes, identical.</b> The condition here doesn't depend on anything computed only inside the body, so both forms behave the same."},
+  {type:"spot-the-bug",q:"When would <code>while(1){if(cond)break;...}</code> and <code>while(!cond){...}</code> actually differ?",
+   opts:["Never","When the first iteration must run before cond is even meaningful","Only with floats","Only with negative numbers"],ans:1,
+   exp:"<b>First-iteration-required cases.</b> If you need to read/compute something before cond can be evaluated, only the while(1)+break (or do-while) form works."},
+  {type:"fill-in-the-blank",q:"The C construct purpose-built for 'run once, then check' is ____-while.",
+   answer:"do",exp:"do-while tests its condition after the first pass, matching exactly this need."}
+ ]
+},
+{
+ id:"pq30", unit:"Unit 2", tab:"Q30 · Collatz",
+ title:"The Collatz conjecture",
+ question:"Simulate Collatz for any n; find the starting number below 10000 with the most steps.",
+ aim:"Apply the even/odd branching rule in a loop and track the longest chain across a range.",
+ file:"q30.c",
+ syntax:[
+  {tok:"n%2==0 ? n/2 : 3*n+1", why:"The Collatz rule",
+   body:"Even numbers halve; odd numbers become 3n+1. Repeating this (conjecturally) always reaches 1, though no one has proven it for all n.",
+   trap:"Using <code>int</code> for n can overflow mid-sequence for some starting values — <code>long</code> is safer."},
+  {tok:"steps counter", why:"Measuring chain length",
+   body:"Each application of the rule counts as one step; the loop runs until n hits 1, so 'steps' measures how long the chain took.",
+   trap:"Off-by-one: whether the final step that reaches 1 counts depends on your definition — be consistent."},
+  {tok:"track the maximum", why:"Scan-and-compare pattern",
+   body:"Loop every starting value, compute its steps, and keep the best (start,steps) pair seen so far — a simple linear scan for the max.",
+   trap:"Recomputing from scratch for every i is fine here, but for huge ranges memoization would help (steps of n often reuse steps of n/2)."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">collatzSteps</span>(<span class="ty">long</span> n){'},
+  {t:'  <span class="ty">int</span> steps=<span class="num">0</span>;'},
+  {t:'  <span class="kw">while</span>(n!=<span class="num">1</span>){',note:"Runs until the sequence reaches 1.",hl:true},
+  {t:'    n=(n%<span class="num">2</span>==<span class="num">0</span>)? n/<span class="num">2</span> : <span class="num">3</span>*n+<span class="num">1</span>;',note:"Even → halve. Odd → triple plus one.",hl:true},
+  {t:'    steps++;'},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> steps;'},
+  {t:'}'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;<span class="num">10000</span>;i++){',note:"Scan every starting value, keep the best.",hl:true},
+  {t:'  <span class="ty">int</span> s=<span class="fn">collatzSteps</span>(i);'},
+  {t:'  <span class="kw">if</span>(s&gt;bestSteps){ bestSteps=s; best=i; }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Collatz(27) — a famously long chain",
+  vars:["n","step count"],
+  steps:[
+   {desc:"n=27 (odd) → 3*27+1 = 82",set:{n:"82","step count":"1"},chg:["n","step count"]},
+   {desc:"n=82 (even) → 41",set:{n:"41","step count":"2"},chg:["n","step count"]},
+   {desc:"n=41 (odd) → 124 ... this chain famously takes 111 steps to reach 1",set:{"step count":"…111 total"},chg:["step count"]},
+   {desc:"Scanning 1..9999, the longest chain starts at <span class='exec'>6171 (261 steps)</span>",set:{},chg:[]}
+  ]
+ },
+ output:[{o:"Starting number below 10000 with most steps: 6171 (261 steps)"},{o:"Collatz(27) takes 111 steps"}],
+ better:{
+  naive:"Recomputing every chain from scratch wastes work — many sequences merge (e.g. once n hits a value you've already processed).",
+  improvements:[
+   "<b>Memoize step counts</b>: cache <code>steps(n)</code> once computed so overlapping chains reuse results.",
+   "<b>Use <code>long</code> or <code>unsigned long</code></b> for n — some starting values spike higher than int range before descending.",
+   "<b>Track the actual sequence</b> (not just step count) if you need to print or analyze the path, not just its length."
+  ],
+  complexity:["Time: O(steps) per number, unbounded (conjectured to always terminate) — total scan varies","Space: O(1) per call, O(n) if memoized"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For odd n, what does the Collatz rule produce?",
+   opts:["n/2","3n+1","n+1","2n"],ans:1,exp:"<b>3n+1.</b> Odd numbers get tripled and incremented; even numbers get halved."},
+  {type:"spot-the-bug",q:"Why declare n as <code>long</code> instead of <code>int</code> in collatzSteps?",
+   opts:["Style","Intermediate values in some chains can exceed int range","Required by C","No reason"],ans:1,
+   exp:"<b>Overflow protection.</b> Some Collatz chains spike to values that could overflow a 32-bit int before eventually descending to 1."},
+  {type:"fill-in-the-blank",q:"The starting number below 10000 with the most Collatz steps is ____.",
+   answer:"6171",exp:"6171 takes 261 steps to reach 1 — the longest chain under 10000."}
+ ]
+},
+{
+ id:"pq31", unit:"Unit 2", tab:"Q31 · Guessing game",
+ title:"Number guessing game with feedback",
+ question:"Pick 1–1000, user gets 10 guesses; report too high/low/correct and analyze optimal strategy.",
+ aim:"Drive a bounded retry loop with three-way feedback, and reason about binary search as the optimal strategy.",
+ file:"q31.c",
+ syntax:[
+  {tok:"tries-- countdown", why:"Bound the attempts",
+   body:"Decrementing <code>tries</code> each guess enforces the 10-attempt limit; the loop naturally ends when it hits 0.",
+   trap:"Decrementing before checking correctness can waste the final legitimate guess if ordered wrong."},
+  {tok:"three-way branch", why:"too high / too low / correct",
+   body:"A single if/else-if/else cleanly reports all three outcomes based on comparing guess to target.",
+   trap:"Forgetting the equality case first (checking it before the inequality branches) would misreport a correct guess as 'too high' or 'too low'."},
+  {tok:"binary search strategy", why:"Optimal play",
+   body:"Always guessing the midpoint of the remaining range halves the search space every turn — log₂(1000) ≈ 10 guesses guaranteed, matching the 10-guess limit exactly.",
+   trap:"Guessing randomly (or sequentially) can easily exceed 10 tries; only bisection guarantees the bound."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> target=<span class="num">750</span>; <span class="ty">int</span> tries=<span class="num">10</span>;'},
+  {t:'<span class="kw">while</span>(tries&gt;<span class="num">0</span>){',note:"Bounded retry loop.",hl:true},
+  {t:'  <span class="fn">scanf</span>(<span class="str">"%d"</span>,&amp;guess); tries--;'},
+  {t:'  <span class="kw">if</span>(guess==target){ <span class="fn">printf</span>(<span class="str">"Correct!\\n"</span>); <span class="kw">break</span>; }',note:"Check equality FIRST.",hl:true},
+  {t:'  <span class="kw">else if</span>(guess&lt;target) <span class="fn">printf</span>(<span class="str">"Too low\\n"</span>);',hl:true},
+  {t:'  <span class="kw">else</span> <span class="fn">printf</span>(<span class="str">"Too high\\n"</span>);',hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Optimal binary-search play toward target=750",
+  vars:["guess","tries left","feedback"],
+  steps:[
+   {desc:"Guess midpoint 500. tries: 10→9",set:{guess:"500","tries left":"9"},chg:["guess","tries left"]},
+   {desc:"500 < 750 → <span class='exec'>Too low</span>. Narrow range to [500,1000]",set:{feedback:"Too low"},chg:["feedback"]},
+   {desc:"Guess new midpoint 750. tries: 9→8",set:{guess:"750","tries left":"8"},chg:["guess","tries left"]},
+   {desc:"750 == target → <span class='exec'>Correct!</span>",set:{feedback:"Correct"},chg:["feedback"]}
+  ]
+ },
+ output:[
+  {o:"Guess a number 1-1000. You have 10 tries."},
+  {p:"Guesses left:10 Enter guess: ",i:"500"},{o:"Too low"},
+  {p:"Guesses left:9 Enter guess: ",i:"750"},{o:"Correct!"}
+ ],
+ better:{
+  naive:"A random or sequential guessing strategy has no guaranteed bound within 10 tries; only bisection does.",
+  improvements:[
+   "<b>Track [low,high] bounds explicitly</b> in the program if you want to auto-suggest the optimal next guess.",
+   "<b>Use a real random target</b> (<code>rand()</code> seeded with <code>time(NULL)</code>) for actual gameplay rather than a fixed demo value.",
+   "<b>Cap feedback precision</b> — 'too high/low' is enough; giving numeric distance would make it trivially easy."
+  ],
+  complexity:["Optimal strategy: O(log₂ 1000) ≈ 10 guesses worst case","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is the provably optimal guessing strategy for this game?",
+   opts:["Guess 1, 2, 3… sequentially","Random guesses","Binary search: always guess the midpoint of the remaining range","Always guess 500"],ans:2,
+   exp:"<b>Binary search.</b> Halving the remaining range each guess guarantees finding any number in 1–1000 within ⌈log₂1000⌉=10 guesses."},
+  {type:"spot-the-bug",q:"Why must the equality check come before the &lt;/&gt; checks?",
+   opts:["Style only","Otherwise a correct guess could be misreported as too high/low","Faster","Required by compiler"],ans:1,
+   exp:"<b>Correct branch ordering.</b> If you checked <code>guess&lt;target</code> first, an equal guess (target-target=0) would never reach the correct branch since 0 isn't &lt; 0, but sloppy ordering elsewhere could still misfire — checking equality first is the safe, clear pattern."},
+  {type:"fill-in-the-blank",q:"log₂(1000) rounded up gives the guaranteed guess bound of ____.",
+   answer:"10",exp:"⌈log₂(1000)⌉ = 10 — matching the game's guess limit exactly, which is not a coincidence."}
+ ]
+},
+{
+ id:"pq32", unit:"Unit 2", tab:"Q32 · Leap year",
+ title:"Leap year: if-else vs loop",
+ question:"Check a leap year with if-else only; then loop years 1600–2400 and count total leap years.",
+ aim:"Apply the three-part leap year rule and compare a single check to a scanning loop.",
+ file:"q32.c",
+ syntax:[
+  {tok:"%4==0 && %100!=0", why:"Basic leap rule with exception",
+   body:"Divisible by 4 is the base rule, but century years (divisible by 100) are excluded — UNLESS divisible by 400.",
+   trap:"Forgetting the century exception makes 1900 (not a leap year) incorrectly count as one."},
+  {tok:"|| %400==0", why:"Exception to the exception",
+   body:"Century years divisible by 400 (like 2000) ARE leap years — this restores the rule for those specific cases.",
+   trap:"Missing this clause wrongly excludes 2000, 2400, etc."},
+  {tok:"loop + counter", why:"Scan and tally",
+   body:"Looping from 1600 to 2400 and calling the same check function accumulates a total — reusing the single-year logic at scale.",
+   trap:"Off-by-one on the loop bounds (< vs <=) changes whether 1600 or 2400 themselves are included."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">isLeap</span>(<span class="ty">int</span> y){',note:"The full 3-part rule in one expression.",hl:true},
+  {t:'  <span class="kw">return</span> (y%<span class="num">4</span>==<span class="num">0</span> &amp;&amp; y%<span class="num">100</span>!=<span class="num">0</span>) || (y%<span class="num">400</span>==<span class="num">0</span>);',hl:true},
+  {t:'}'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> yr=<span class="num">1600</span>; yr&lt;=<span class="num">2400</span>; yr++) <span class="kw">if</span>(<span class="fn">isLeap</span>(yr)) count++;',note:"Reuse the check across the whole range.",hl:true}
+ ],
+ mem:{
+  title:"Testing 1900, 2000, 2024",
+  vars:["year","%4==0","%100!=0","%400==0","isLeap?"],
+  steps:[
+   {desc:"1900: %4==0 true, %100!=0 FALSE (1900%100=0)",set:{year:"1900","%4==0":"true","%100!=0":"false"},chg:["year","%4==0","%100!=0"]},
+   {desc:"First clause fails. %400==0? 1900%400=300, false too. → <span class='exec'>NOT leap</span>",set:{"%400==0":"false","isLeap?":"NO"},chg:["%400==0","isLeap?"]},
+   {desc:"2000: %4==0 true, %100!=0 false, but %400==0 TRUE → <span class='exec'>IS leap</span>",set:{year:"2000","isLeap?":"YES"},chg:["year","isLeap?"]},
+   {desc:"2024: %4==0 true, %100!=0 true → first clause true → <span class='exec'>IS leap</span>",set:{year:"2024","isLeap?":"YES"},chg:["year","isLeap?"]}
+  ]
+ },
+ output:[{o:"2024 is a leap year (if-else only)"},{o:"Leap years from 1600 to 2400: 195"}],
+ better:{
+  naive:"A single-year check is fine standalone, but re-deriving the rule inline in a loop (instead of calling a function) invites copy-paste drift.",
+  improvements:[
+   "<b>Factor the rule into a function</b> (as done here) so the loop and single-check paths can't diverge.",
+   "<b>Add a boundary test suite</b>: 1900 (false), 2000 (true), 2100 (false), 2400 (true) — these are the classic tricky cases.",
+   "<b>Use <code>stdbool.h</code></b> so <code>isLeap</code> returns a real <code>bool</code> rather than a bare int."
+  ],
+  complexity:["Single check: O(1)","Range scan: O(n) for n years","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is 1900 a leap year?",
+   opts:["Yes","No — divisible by 100 but not 400","Only in some calendars","Undefined"],ans:1,
+   exp:"<b>No.</b> 1900 is divisible by 100 but not by 400, so the century exception disqualifies it."},
+  {type:"predict-the-output",q:"Is 2000 a leap year?",
+   opts:["No","Yes — divisible by 400","Only if divisible by 4 alone","Undefined"],ans:1,
+   exp:"<b>Yes.</b> 2000 is divisible by 400, which restores leap status despite being a century year."},
+  {type:"fill-in-the-blank",q:"The full rule: divisible by 4 AND NOT by 100, OR divisible by ____.",
+   answer:"400",exp:"The %400==0 clause is the exception-to-the-exception for century years."}
+ ]
+},
+{
+ id:"pq33", unit:"Unit 2", tab:"Q33 · Digit rearrangements",
+ title:"Rearrange digits, test primality",
+ question:"For a 3-digit number, generate all digit rearrangements and classify each as prime or not.",
+ aim:"Use nested loops with a distinctness guard to generate permutations, then test each with trial division.",
+ file:"q33.c",
+ syntax:[
+  {tok:"triple nested loop + distinctness check", why:"Generate permutations without a library",
+   body:"Looping i,j,k over the 3 digit positions and requiring all three indices differ produces every permutation exactly once.",
+   trap:"Omitting the distinctness check (<code>i!=j && j!=k && i!=k</code>) would reuse the same digit twice."},
+  {tok:"isPrime via trial division", why:"Check up to √n",
+   body:"Only testing divisors up to <code>sqrt(n)</code> (via <code>i*i&lt;=n</code>) is enough — any factor larger than √n pairs with one smaller than it.",
+   trap:"Looping all the way to n is correct but wastefully slow for larger numbers."},
+  {tok:"switch selection (per manual)", why:"Alternative structuring",
+   body:"The manual suggests switch-case for digit selection; nested loops with index arrays achieve the same generation more compactly.",
+   trap:"For only 3 digits either approach works fine; switch-case shines more when selection logic is more complex."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> d[<span class="num">3</span>]={<span class="num">1</span>,<span class="num">2</span>,<span class="num">3</span>};'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">3</span>;i++)<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;<span class="num">3</span>;j++)<span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;<span class="num">3</span>;k++){',note:"Every combination of 3 positions.",hl:true},
+  {t:'  <span class="kw">if</span>(i!=j &amp;&amp; j!=k &amp;&amp; i!=k){',note:"Distinctness guard — ensures a true permutation, no repeats.",hl:true},
+  {t:'    <span class="ty">int</span> num=d[i]*<span class="num">100</span>+d[j]*<span class="num">10</span>+d[k];',note:"Build the 3-digit number from the chosen order."},
+  {t:'    <span class="fn">printf</span>(<span class="str">"%d: %s\\n"</span>, num, <span class="fn">isPrime</span>(num)?<span class="str">"prime"</span>:<span class="str">"not prime"</span>);'},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Generating permutations of 1,2,3",
+  vars:["i,j,k","distinct?","num","isPrime?"],
+  steps:[
+   {desc:"i=0,j=0,k=0: all same → skip (distinctness fails)",set:{"i,j,k":"0,0,0","distinct?":"no"},chg:["i,j,k","distinct?"]},
+   {desc:"i=0,j=1,k=2: distinct! num = 1*100+2*10+3 = 123",set:{"i,j,k":"0,1,2","distinct?":"yes",num:"123"},chg:["i,j,k","distinct?","num"]},
+   {desc:"123 = 3×41 → <span class='exec'>not prime</span>",set:{"isPrime?":"no"},chg:["isPrime?"]},
+   {desc:"...continues through all 6 valid permutations; none are prime for digits {1,2,3}",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"123: not prime"},{o:"132: not prime"},{o:"213: not prime"},
+  {o:"231: not prime"},{o:"312: not prime"},{o:"321: not prime"}
+ ],
+ better:{
+  naive:"Triple nested loop with a runtime distinctness check regenerates and discards 21 of 27 combinations just to find the 6 valid permutations.",
+  improvements:[
+   "<b>Use a proper permutation algorithm</b> (swap-based, Heap's algorithm) for larger digit counts — this triple-loop approach only scales to 3–4 digits.",
+   "<b>Precompute divisibility rules</b> (sum of digits for 3, last digit for 2/5) to fast-reject obvious composites before trial division.",
+   "<b>Deduplicate</b> if the input digits repeat (e.g. 1,1,2) — this generator would currently produce duplicate permutations."
+  ],
+  complexity:["Permutation generation: O(n³) here for n=3 (fine at this scale)","Primality test: O(√num) per candidate"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why require i!=j && j!=k && i!=k?",
+   opts:["Style","Ensures each digit position is used exactly once — a true permutation","Speeds up primality test","No reason"],ans:1,
+   exp:"<b>True permutations only.</b> Without this guard, the loops would generate combinations that reuse the same source digit twice."},
+  {type:"spot-the-bug",q:"Why test divisors only up to sqrt(n) in isPrime?",
+   opts:["Faster, and factors above √n always pair with one below it","Style","Required by C","It's a bug — misses factors"],ans:0,
+   exp:"<b>Correct and complete.</b> If n = a×b with a≤b, then a ≤ √n, so any factor exists below √n too — testing further is redundant."},
+  {type:"fill-in-the-blank",q:"None of the 6 permutations of digits 1,2,3 are ____.",
+   answer:"prime",exp:"123, 132, 213, 231, 312, 321 are all composite — verified by trial division."}
+ ]
+},
+{
+ id:"pq34", unit:"Unit 2", tab:"Q34 · Caesar cipher",
+ title:"Caesar cipher encode/decode",
+ question:"Encode/decode with a shift value; handle case and non-alphabetic characters correctly.",
+ aim:"Wrap letters within their case's alphabet range using modulo arithmetic, leaving punctuation untouched.",
+ file:"q34.c",
+ syntax:[
+  {tok:"(c-'A'+shift)%26+'A'", why:"Wrap within the alphabet",
+   body:"Shifting past 'Z' must wrap back to 'A'. Subtracting the base ('A'), adding the shift, taking modulo 26, then adding the base back keeps the result in range.",
+   trap:"Forgetting to subtract the base first shifts the wrong range entirely — you'd wrap around ASCII, not the alphabet."},
+  {tok:"((x%26)+26)%26", why:"Handle negative shifts safely",
+   body:"For decoding (negative shift), C's <code>%</code> can return a negative remainder. Adding 26 before the final <code>%26</code> guarantees a non-negative result.",
+   trap:"Skipping the <code>+26</code> lets decode shifts produce negative indices, corrupting the wrap-around."},
+  {tok:"isupper / islower guard", why:"Leave non-letters untouched",
+   body:"Punctuation, spaces, and digits pass through unchanged — only actual letters get shifted, preserving message structure.",
+   trap:"Shifting everything (including punctuation ASCII codes) garbles the message structure irrecoverably."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">caesar</span>(<span class="ty">char</span>*s,<span class="ty">int</span> shift,<span class="ty">char</span> mode){'},
+  {t:'  <span class="kw">if</span>(mode==<span class="str">\'D\'</span>) shift=-shift;',note:"Decoding is just encoding with the negative shift."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;s[i];i++){'},
+  {t:'    <span class="kw">if</span>(<span class="fn">isupper</span>(c)) s[i]=<span class="str">\'A\'</span>+((c-<span class="str">\'A\'</span>+shift)%<span class="num">26</span>+<span class="num">26</span>)%<span class="num">26</span>;',note:"Wrap within A-Z, safe for negative shifts.",hl:true},
+  {t:'    <span class="kw">else if</span>(<span class="fn">islower</span>(c)) s[i]=<span class="str">\'a\'</span>+((c-<span class="str">\'a\'</span>+shift)%<span class="num">26</span>+<span class="num">26</span>)%<span class="num">26</span>;',hl:true},
+  {t:'    <span class="cm">// non-letters fall through unchanged</span>',note:"Punctuation and spaces are never touched."},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Encoding 'H' with shift 3",
+  vars:["c","c-'A'","+shift %26","result"],
+  steps:[
+   {desc:"c = 'H' (ASCII 72)",set:{c:"'H'"},chg:["c"]},
+   {desc:"c-'A' = 72-65 = 7",set:{"c-'A'":"7"},chg:["c-'A'"]},
+   {desc:"(7+3)%26 = 10",set:{"+shift %26":"10"},chg:["+shift %26"]},
+   {desc:"'A'+10 = <span class='exec'>'K'</span>",set:{result:"'K'"},chg:["result"]}
+  ]
+ },
+ output:[
+  {o:"Original: Hello, Retail!"},
+  {o:"Encrypted (shift 3): Khoor, Uhwdlo!"},
+  {o:"Decrypted back: Hello, Retail!"}
+ ],
+ better:{
+  naive:"Works correctly, but re-deriving the wrap formula for upper and lower separately duplicates logic that could be unified.",
+  improvements:[
+   "<b>Extract a helper</b> <code>shiftChar(c, base, shift)</code> shared by both the upper and lower branches to remove duplication.",
+   "<b>Normalize the shift once</b> (<code>shift = ((shift%26)+26)%26</code>) up front rather than repeating the safety math per character.",
+   "<b>To break an unknown-shift message</b>, try all 26 shifts and score each result against English letter frequency to find the most plausible one."
+  ],
+  complexity:["Time: O(n) in message length","Space: O(1) — modifies in place"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Encoding 'Z' with shift 3 gives?",
+   opts:["']'","'C'","'Z'","Error"],ans:1,exp:"<b>'C'.</b> (25+3)%26 = 2, so 'A'+2 = 'C' — the wrap-around back to the start of the alphabet."},
+  {type:"spot-the-bug",q:"Why add 26 before the final %26 in the formula?",
+   opts:["Unnecessary","C's % can return negative for negative shifts (decoding)","Speeds up the loop","Style"],ans:1,
+   exp:"<b>Negative-safe wrap.</b> When decoding uses a negative shift, C's modulo can return negative; adding 26 first guarantees a non-negative result before the final %26."},
+  {type:"fill-in-the-blank",q:"Non-alphabetic characters like ',' and '!' should be ____ by the cipher.",
+   answer:"unchanged",exp:"Only letters get shifted; punctuation and spaces pass through untouched to preserve message structure."}
+ ]
+},
+{
+ id:"pq35", unit:"Unit 2", tab:"Q35 · for vs while",
+ title:"Choosing for vs while",
+ question:"Construct a case where for is clearly better, and one where while is clearly better.",
+ aim:"Match the loop construct to whether the iteration count is known in advance or condition-driven.",
+ file:"q35.c",
+ syntax:[
+  {tok:"for — known count", why:"Iteration count is fixed",
+   body:"When you know exactly how many times to loop (like 0 to 4), <code>for</code> bundles init/condition/increment together, making the bound obvious at a glance.",
+   trap:"Using <code>for</code> and abusing the increment clause for unrelated logic instead of pure iteration makes it harder to read."},
+  {tok:"while — condition-driven", why:"Unknown iteration count",
+   body:"When the loop should run until some data-driven condition (like hitting a sentinel value), <code>while</code> expresses 'keep going until' more naturally than forcing a fake counter.",
+   trap:"Forcing a <code>for</code> loop with a huge/fake bound just to hide a while-style condition obscures intent."}
+ ],
+ code:[
+  {t:'<span class="cm">// FOR: known iteration count</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">5</span>;i++) <span class="fn">printf</span>(<span class="str">"%d "</span>,i);',note:"Bound (5) is fixed and known up front."},
+  {t:'<span class="cm">// WHILE: unknown count, sentinel-driven</span>',hl:true},
+  {t:'<span class="ty">int</span> x;'},
+  {t:'<span class="kw">while</span>((x=demo[idx++])!=-<span class="num">1</span>) <span class="fn">printf</span>(<span class="str">"%d "</span>, x);',note:"Keeps going until a sentinel value appears — count isn't known ahead of time."}
+ ],
+ mem:{
+  title:"Two different iteration styles",
+  vars:["for: i","while: x","while: idx"],
+  steps:[
+   {desc:"for loop: i runs 0,1,2,3,4 — exactly 5 known iterations",set:{"for: i":"0→4 (5 total)"},chg:["for: i"]},
+   {desc:"while loop reads demo[]={3,7,2,-1}: x=3, print",set:{"while: x":"3","while: idx":"1"},chg:["while: x","while: idx"]},
+   {desc:"x=7, print. x=2, print. x=-1 → <span class='exec'>sentinel hit, loop stops</span> (3 iterations, not known ahead of time)",set:{"while: x":"-1 (stop)"},chg:["while: x"]}
+  ]
+ },
+ output:[{o:"for (clear count): 0 1 2 3 4"},{o:"while (unknown count, sentinel-driven): 3 7 2"}],
+ better:{
+  naive:"Neither loop form is 'better' universally — misusing one for the other's natural case is what actually hurts readability.",
+  improvements:[
+   "<b>Default to <code>for</code></b> whenever the bound is a simple counter — it keeps init/test/increment together and visible.",
+   "<b>Default to <code>while</code></b> whenever the exit condition is about data, not a count — sentinel values, EOF, user input.",
+   "<b>Refactor when you notice the mismatch</b>: a for-loop with a weird increment clause, or a while-loop secretly counting iterations, is a sign to switch."
+  ],
+  complexity:["Both O(n) in their respective iteration counts","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Which loop is more natural for 'read values until a sentinel -1 appears'?",
+   opts:["for","while","Neither works","Both identical"],ans:1,
+   exp:"<b>while.</b> The iteration count is unknown ahead of time — it depends entirely on when the sentinel shows up in the data."},
+  {type:"predict-the-output",q:"Which loop is more natural for 'print numbers 0 through 4'?",
+   opts:["for","while","goto","Neither"],ans:0,
+   exp:"<b>for.</b> The count (5 iterations) is fixed and known before the loop starts — exactly what for's three-part header is designed to express."},
+  {type:"fill-in-the-blank",q:"A loop driven by a sentinel value in the data, rather than a fixed count, is more naturally written as a ____ loop.",
+   answer:"while",exp:"while expresses 'keep going while a condition holds' without forcing a fake counter."}
+ ]
+}
+];
+/* ===== PRACTICE QUESTIONS — UNIT 2 (Q36–50) ===== */
+PRACTICE_U2.push(
+{
+ id:"pq36", unit:"Unit 2", tab:"Q36 · Floyd's triangle",
+ title:"Floyd's triangle, forward and reversed",
+ question:"Print the first n rows of Floyd's triangle; then reverse it (last row first).",
+ aim:"Track a running counter across nested loops, then precompute row-start values to reverse the order.",
+ file:"q36.c",
+ syntax:[
+  {tok:"num++ across rows", why:"Running counter, not reset per row",
+   body:"Unlike a multiplication table, Floyd's triangle keeps incrementing <code>num</code> continuously — row 2 continues where row 1 left off.",
+   trap:"Resetting num to 1 at the start of each row would produce a completely different (wrong) pattern."},
+  {tok:"precompute row starts", why:"Needed to print backwards",
+   body:"To print the last row first, you must know where each row's numbers began — computed once via a running total of row lengths before reversing.",
+   trap:"Trying to reverse by just running the forward loop backwards doesn't give the right numbers — the row contents depend on cumulative counts, not position alone."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> num=<span class="num">1</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;=n;i++){',note:"Outer: one row per i."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">1</span>;j&lt;=i;j++) <span class="fn">printf</span>(<span class="str">"%d "</span>,num++);',note:"num keeps climbing across ALL rows — never resets.",hl:true},
+  {t:'  <span class="fn">printf</span>(<span class="str">"\\n"</span>);'},
+  {t:'}'},
+  {t:'<span class="cm">// Reversed: precompute where each row started</span>'},
+  {t:'<span class="ty">int</span> starts[<span class="num">10</span>], c=<span class="num">1</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;=n;i++){ starts[i]=c; c+=i; }',note:"starts[i] = first number of row i.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=n;i&gt;=<span class="num">1</span>;i--){',note:"Now print rows in reverse order using precomputed starts.",hl:true},
+  {t:'  <span class="ty">int</span> v=starts[i];'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">1</span>;j&lt;=i;j++) <span class="fn">printf</span>(<span class="str">"%d "</span>,v++);'},
+  {t:'  <span class="fn">printf</span>(<span class="str">"\\n"</span>);'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Building rows and their start values",
+  vars:["num","row","starts[]"],
+  steps:[
+   {desc:"Row 1: prints 1. num→2",set:{row:"1",num:"2"},chg:["row","num"]},
+   {desc:"Row 2: prints 2,3. num→4",set:{row:"2",num:"4"},chg:["row","num"]},
+   {desc:"Row 3: prints 4,5,6. num→7",set:{row:"3",num:"7"},chg:["row","num"]},
+   {desc:"starts[] computed: [_,1,2,4,7,11] — row i begins at starts[i]",set:{"starts[]":"1,2,4,7,11"},chg:["starts[]"]},
+   {desc:"Reversed printing uses starts[5]=11 first, then starts[4]=7, etc.",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Floyd's triangle:"},{o:"1"},{o:"2 3"},{o:"4 5 6"},{o:"7 8 9 10"},{o:"11 12 13 14 15"},
+  {o:"Reversed (last row first):"},{o:"11 12 13 14 15"},{o:"7 8 9 10"},{o:"4 5 6"},{o:"2 3"},{o:"1"}
+ ],
+ better:{
+  naive:"The forward version is clean, but a naive reverse attempt (just flipping the loop direction) would print wrong numbers without the precomputed starts.",
+  improvements:[
+   "<b>Precomputing row starts</b> (as done) is the key insight — it's O(n) extra work for a correct reverse.",
+   "<b>Alternative: build a 2D array first</b>, then print rows in any order you like — trades memory for simplicity.",
+   "<b>Generalize row-start math</b>: row i starts at 1 + sum of (1..i-1) = 1 + i(i-1)/2, avoiding the running-total loop entirely."
+  ],
+  complexity:["Time: O(n²) to print n rows (total n(n+1)/2 numbers)","Space: O(n) for the starts array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"In Floyd's triangle, does the counter reset at the start of each row?",
+   opts:["Yes, always 1","No, it keeps climbing across all rows","Only for even rows","Depends on n"],ans:1,
+   exp:"<b>No.</b> The same running counter continues incrementing from row to row — that's what distinguishes it from a multiplication table."},
+  {type:"spot-the-bug",q:"Why can't you just run the forward loop with i from n down to 1 to get the reverse?",
+   opts:["You can, it's identical","Row contents depend on cumulative position, not just row length","Syntax error","No difference"],ans:1,
+   exp:"<b>Cumulative dependency.</b> Row 3's actual numbers (4,5,6) depend on how many numbers came before in rows 1-2, so you need the precomputed start value, not just the row's length."},
+  {type:"fill-in-the-blank",q:"Row i of Floyd's triangle starts at value <code>1 + i*(i-1)/____</code>.",
+   answer:"2",exp:"The sum of row lengths 1..i-1 is (i-1)i/2, so row i starts right after that many numbers."}
+ ]
+},
+{
+ id:"pq37", unit:"Unit 2", tab:"Q37 · EMI calculator",
+ title:"Loan EMI calculator with amortization",
+ question:"Compute EMI from principal, rate, tenure; show a full month-by-month amortization table.",
+ aim:"Apply the standard EMI formula, then simulate the payment schedule to show interest vs principal splitting.",
+ file:"q37.c",
+ syntax:[
+  {tok:"EMI formula", why:"P × r × (1+r)^n / ((1+r)^n - 1)",
+   body:"The standard amortizing-loan formula: P=principal, r=monthly rate, n=months. It computes a fixed monthly payment that fully retires the loan by the last month.",
+   trap:"Using the annual rate directly instead of converting to a monthly rate (÷12÷100) gives a wildly wrong EMI."},
+  {tok:"pow(1+r, months)", why:"Compound growth factor",
+   body:"<code>&lt;math.h&gt;</code>'s <code>pow</code> computes (1+r) raised to the number of months — the compounding term in the formula.",
+   trap:"Forgetting to link <code>-lm</code> when compiling causes a linker error for <code>pow</code>/<code>sqrt</code> on some systems."},
+  {tok:"amortization loop", why:"Split each payment into interest + principal",
+   body:"Each month: interest = balance×r; principal_paid = EMI − interest; balance −= principal_paid. Watching balance shrink to (near) zero verifies the EMI is correct.",
+   trap:"Floating-point rounding can leave a tiny non-zero remainder in the final month — real systems adjust the last payment to zero it out exactly."}
+ ],
+ code:[
+  {t:'<span class="ty">double</span> r=annualRate/<span class="num">12</span>/<span class="num">100</span>;',note:"Convert annual % rate to a monthly decimal rate.",hl:true},
+  {t:'<span class="ty">double</span> emi = principal*r*<span class="fn">pow</span>(<span class="num">1</span>+r,months)/(<span class="fn">pow</span>(<span class="num">1</span>+r,months)-<span class="num">1</span>);',note:"Standard amortization formula.",hl:true},
+  {t:'<span class="ty">double</span> balance=principal;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> m=<span class="num">1</span>;m&lt;=months;m++){',note:"Simulate each month's payment split.",hl:true},
+  {t:'  <span class="ty">double</span> interest=balance*r;',note:"Interest charged on the CURRENT remaining balance."},
+  {t:'  <span class="ty">double</span> princ=emi-interest;',note:"Whatever's left of the fixed EMI pays down principal."},
+  {t:'  balance-=princ;',hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Loan 100000 @ 12%/yr, 6 months",
+  vars:["r (monthly)","EMI","month","interest","principal paid","balance"],
+  steps:[
+   {desc:"r = 12/12/100 = 0.01 (1% monthly)",set:{"r (monthly)":"0.01"},chg:["r (monthly)"]},
+   {desc:"EMI computed = 17254.84 (fixed every month)",set:{EMI:"17254.84"},chg:["EMI"]},
+   {desc:"Month 1: interest=100000×0.01=1000. principal paid=17254.84−1000=16254.84. balance=83745.16",
+    set:{month:"1",interest:"1000.00","principal paid":"16254.84",balance:"83745.16"},chg:["month","interest","principal paid","balance"]},
+   {desc:"...by month 6: balance reaches exactly <span class='exec'>0.00</span> — loan fully repaid",set:{month:"6",balance:"0.00"},chg:["month","balance"]}
+  ]
+ },
+ output:[
+  {o:"Monthly EMI: 17254.84"},
+  {o:"Mon   EMI         Interest    Principal   Balance"},
+  {o:"1     17254.84    1000.00     16254.84    83745.16"},
+  {o:"...  (months 2-5)  ..."},
+  {o:"6     17254.84    170.84      17084.00    0.00"}
+ ],
+ better:{
+  naive:"Doesn't validate inputs (negative rate, zero months) and can accumulate tiny floating-point drift over many months.",
+  improvements:[
+   "<b>Validate inputs</b>: reject negative principal/rate or zero/negative tenure before computing.",
+   "<b>Round the final payment</b> to force balance to exactly 0.00, absorbing any floating-point drift in the last installment.",
+   "<b>Support prepayment</b> scenarios by allowing extra principal payments and recalculating the remaining schedule."
+  ],
+  complexity:["Time: O(months) to build the full table","Space: O(1) — no need to store all months if just printing"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why divide the annual rate by 12 and then by 100?",
+   opts:["Style","Converts annual percentage to a monthly decimal rate","Required by pow()","No reason"],ans:1,
+   exp:"<b>Unit conversion.</b> 12% annual becomes 1% monthly (÷12), and a percentage becomes a decimal (÷100) for use in the formula."},
+  {type:"spot-the-bug",q:"In the amortization loop, why does interest shrink each month?",
+   opts:["It's a bug — should stay constant","Interest is charged on the shrinking remaining balance","Random each month","EMI decreases"],ans:1,
+   exp:"<b>Interest scales with balance.</b> As principal gets paid down, the balance shrinks, so the same rate produces less interest each month — meaning more of the fixed EMI goes to principal over time."},
+  {type:"fill-in-the-blank",q:"After the final month's payment, the remaining balance should be ____.",
+   answer:"0",exp:"A correctly computed EMI fully retires the loan, leaving a balance of 0 (or very near it, due to floating-point rounding)."}
+ ]
+},
+{
+ id:"pq38", unit:"Unit 2", tab:"Q38 · Break nested loops",
+ title:"Exiting nested loops: 3 approaches",
+ question:"break only exits one loop level. Present flag, goto, and function solutions; evaluate each.",
+ aim:"Compare three idioms for escaping multiple loop levels at once when a target is found.",
+ file:"q38.c",
+ syntax:[
+  {tok:"flag variable", why:"Check the flag at each level",
+   body:"A boolean flag set on found, checked in each loop's own condition (<code>!found</code>), lets every level exit gracefully without a jump.",
+   trap:"Forgetting to check the flag in the OUTER loop's condition means only the inner loop actually stops."},
+  {tok:"goto", why:"Direct jump out of any nesting depth",
+   body:"<code>goto done;</code> jumps straight past all loop levels to a label. Controversial stylistically, but genuinely the cleanest for deeply nested exits.",
+   trap:"Overusing goto for general control flow harms readability — this specific 'multi-level break' use is one of its few widely-accepted uses."},
+  {tok:"extract into a function", why:"return exits everything at once",
+   body:"Moving the nested search into its own function lets a simple <code>return</code> unwind out of all loop levels instantly — often the cleanest option.",
+   trap:"If the search needs a lot of surrounding context (many variables), passing them all into a helper function adds friction."}
+ ],
+ code:[
+  {t:'<span class="cm">// FLAG approach</span>',hl:true},
+  {t:'<span class="ty">int</span> found=<span class="num">0</span>;'},
+  {t:'<span class="kw">for</span>(i=<span class="num">0</span>;i&lt;<span class="num">3</span> &amp;&amp; !found;i++)',note:"Outer loop ALSO checks !found.",hl:true},
+  {t:'  <span class="kw">for</span>(j=<span class="num">0</span>;j&lt;<span class="num">3</span>;j++)'},
+  {t:'    <span class="kw">if</span>(mat[i][j]==target){ found=<span class="num">1</span>; <span class="kw">break</span>; }'},
+  {t:'<span class="cm">// GOTO approach</span>',hl:true},
+  {t:'<span class="kw">for</span>(i=<span class="num">0</span>;i&lt;<span class="num">3</span>;i++)'},
+  {t:'  <span class="kw">for</span>(j=<span class="num">0</span>;j&lt;<span class="num">3</span>;j++)'},
+  {t:'    <span class="kw">if</span>(mat[i][j]==target) <span class="kw">goto</span> done;',note:"Jumps straight past BOTH loops.",hl:true},
+  {t:'done: ;'},
+  {t:'<span class="cm">// FUNCTION approach — return unwinds everything at once</span>',hl:true}
+ ],
+ mem:{
+  title:"Finding 5 in a 3×3 matrix",
+  vars:["method","found at"],
+  steps:[
+   {desc:"Flag method: outer loop checks !found each pass. Finds 5 at [1][1], sets found=1, both loops stop.",set:{method:"flag","found at":"[1][1]"},chg:["method","found at"]},
+   {desc:"Goto method: same search, but jumps directly to 'done:' label the instant it's found.",set:{method:"goto"},chg:["method"]},
+   {desc:"Function method: nested loops live inside findFunc(); a plain return exits everything in one step.",set:{method:"function"},chg:["method"]}
+  ]
+ },
+ output:[
+  {o:"Flag method: found at [1][1]"},
+  {o:"Goto method: found at [1][1]"},
+  {o:"Function method: found at [1][1]"}
+ ],
+ better:{
+  naive:"All three work correctly here; the real tradeoff is readability and maintainability, not correctness.",
+  improvements:[
+   "<b>Flag</b>: no goto, but adds a condition to every loop level — clutters the loop headers as nesting grows.",
+   "<b>Goto</b>: cleanest jump for deep nesting; restricted to this well-accepted use case, it's often the most readable choice in C.",
+   "<b>Function + return</b>: usually the best long-term choice — it also naturally encapsulates the search as a reusable, testable unit."
+  ],
+  complexity:["All three: O(rows×cols) worst case — same search cost, different exit mechanics","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Does a plain <code>break</code> inside the inner loop stop the outer loop too?",
+   opts:["Yes, always","No — it only exits the innermost loop","Only with goto","Depends on compiler"],ans:1,
+   exp:"<b>No.</b> break only unwinds one level. The outer loop continues its next iteration unless you add extra logic (flag) or a jump (goto/return)."},
+  {type:"spot-the-bug",q:"In the flag approach, what happens if you forget to add <code>!found</code> to the OUTER loop's condition?",
+   opts:["Nothing changes","The outer loop keeps iterating even after the target is found","Compile error","Inner loop breaks twice"],ans:1,
+   exp:"<b>Outer loop keeps going.</b> The flag stops the inner loop, but without checking it in the outer condition too, the outer loop wastefully continues."},
+  {type:"fill-in-the-blank",q:"Extracting the nested search into its own function lets a plain ____ statement exit all loop levels at once.",
+   answer:"return",exp:"return immediately exits the function, unwinding through any number of nested loops inside it."}
+ ]
+},
+{
+ id:"pq39", unit:"Unit 2", tab:"Q39 · Perfect numbers",
+ title:"Perfect numbers up to 10 million",
+ question:"Check if a number is perfect (sum of divisors = itself); find all perfect numbers up to 10,000,000.",
+ aim:"Optimize divisor-sum computation to O(√n) by pairing divisors, instead of a naive O(n) scan.",
+ file:"q39.c",
+ syntax:[
+  {tok:"j*j<=i divisor scan", why:"Only check up to √i",
+   body:"Every divisor pair (j, i/j) has one member ≤ √i. Scanning only that far and adding both members of each pair finds all divisors in O(√i).",
+   trap:"Scanning all the way to i/2 (the naive approach) is correct but far slower for large i."},
+  {tok:"if(j != i/j)", why:"Avoid double-counting the square root",
+   body:"When i is a perfect square, j equals i/j at the midpoint — adding it twice would overcount. This guard adds it only once in that case.",
+   trap:"Omitting this check inflates the divisor sum for perfect squares, causing false negatives/positives."},
+  {tok:"sum starts at 1", why:"1 always divides",
+   body:"1 is a proper divisor of every number ≥ 2, so the sum starts there rather than being found by the loop (which starts at 2 for efficiency).",
+   trap:"Starting the loop at 1 instead of 2 would redundantly re-add 1 via the pairing logic."}
+ ],
+ code:[
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">2</span>;i&lt;=<span class="num">10000</span>;i++){'},
+  {t:'  <span class="ty">int</span> sum=<span class="num">1</span>;',note:"1 always divides — start the sum there.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">2</span>;j*j&lt;=i;j++){',note:"Only scan up to sqrt(i), not all the way to i/2.",hl:true},
+  {t:'    <span class="kw">if</span>(i%j==<span class="num">0</span>){ sum+=j; <span class="kw">if</span>(j!=i/j) sum+=i/j; }',note:"Add BOTH members of the divisor pair, unless they're equal.",hl:true},
+  {t:'  }'},
+  {t:'  <span class="kw">if</span>(sum==i) <span class="fn">printf</span>(<span class="str">"%d "</span>, i);',note:"Perfect number: divisors sum exactly to itself."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Checking 28 for perfection",
+  vars:["i","j","sum"],
+  steps:[
+   {desc:"i=28, sum starts at 1 (√28≈5.3, scan j=2..5)",set:{i:"28",sum:"1"},chg:["i",'sum']},
+   {desc:"j=2: 28%2==0 → sum+=2, sum+=14 (28/2). sum=17",set:{j:"2",sum:"17"},chg:["j","sum"]},
+   {desc:"j=4: 28%4==0 → sum+=4, sum+=7. sum=28",set:{j:"4",sum:"28"},chg:["j","sum"]},
+   {desc:"j=5: 25≤28 but 28%5≠0, no change. Loop ends (j*j=36>28)",set:{j:"5"},chg:["j"]},
+   {desc:"sum(28)==28 → <span class='exec'>Perfect number!</span>",set:{},chg:[]}
+  ]
+ },
+ output:[{o:"Perfect numbers up to 10000:"},{o:"6 28 496 8128"}],
+ better:{
+  naive:"A naive O(n) divisor scan per number makes checking up to 10 million extremely slow (~10 million × 10 million operations worst case).",
+  improvements:[
+   "<b>The √n pairing technique</b> (shown here) reduces each check to O(√n) — the essential optimization.",
+   "<b>Skip odd numbers early</b> if you only care about even perfect numbers (all known perfect numbers are even, tied to Mersenne primes).",
+   "<b>For 10,000,000</b>, this optimized approach is still ~10M×√10M ≈ 30 billion ops — genuinely large-scale problems need the Euclid-Euler theorem (perfect numbers ↔ Mersenne primes) rather than brute force."
+  ],
+  complexity:["Naive: O(n) per number, O(n²) total","Optimized: O(√n) per number, O(n^1.5) total","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is 6 a perfect number?",
+   opts:["No","Yes — 1+2+3=6","Only if doubled","Undefined"],ans:1,
+   exp:"<b>Yes.</b> The proper divisors of 6 are 1, 2, and 3, and they sum to exactly 6."},
+  {type:"spot-the-bug",q:"Why check <code>if(j != i/j)</code> before adding <code>i/j</code>?",
+   opts:["Style","Avoids double-counting when i is a perfect square","Speeds up the loop","Required syntax"],ans:1,
+   exp:"<b>Avoid double-count.</b> When j equals i/j (i is a perfect square), adding both would count that divisor twice."},
+  {type:"fill-in-the-blank",q:"Scanning divisors only up to ____(i) instead of i/2 is the key optimization.",
+   answer:"sqrt",exp:"sqrt(i) — every divisor pair has one member at or below the square root."}
+ ]
+},
+{
+ id:"pq40", unit:"Unit 2", tab:"Q40 · Password validator",
+ title:"do-while password validation",
+ question:"Validate: min 8 chars, 1 uppercase, 1 digit, 1 special. Why is do-while more appropriate than while?",
+ aim:"Loop until the password satisfies all rules, using do-while since at least one attempt is guaranteed.",
+ file:"q40.c",
+ syntax:[
+  {tok:"do-while(!valid)", why:"Must prompt at least once",
+   body:"There's no password to validate before the first prompt — the loop MUST run once regardless, which is do-while's defining trait.",
+   trap:"Using plain <code>while</code> here would need a duplicate prompt before the loop just to have something to check."},
+  {tok:"isupper/isdigit/isalnum scan", why:"Check all four rules in one pass",
+   body:"A single loop over the string sets four flags (length is just <code>strlen</code>); by the end you know if every rule is satisfied.",
+   trap:"Checking rules in separate loops works but re-scans the string multiple times unnecessarily."},
+  {tok:"!isalnum as 'special'", why:"Special = not letter, not digit",
+   body:"Rather than listing every special character, defining 'special' as 'anything that's not alphanumeric' covers punctuation, symbols, etc. in one check.",
+   trap:"Explicitly listing symbols (!@#$...) is more restrictive and easy to leave gaps in."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> valid;'},
+  {t:'<span class="kw">do</span>{',note:"Runs at least once — nothing to check before first input.",hl:true},
+  {t:'  <span class="fn">scanf</span>(<span class="str">"%49s"</span>,pw);'},
+  {t:'  <span class="ty">int</span> len=<span class="fn">strlen</span>(pw), up=<span class="num">0</span>,dig=<span class="num">0</span>,spec=<span class="num">0</span>;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;len;i++){',note:"One pass sets all three character-type flags.",hl:true},
+  {t:'    <span class="kw">if</span>(<span class="fn">isupper</span>(pw[i])) up=<span class="num">1</span>;'},
+  {t:'    <span class="kw">else if</span>(<span class="fn">isdigit</span>(pw[i])) dig=<span class="num">1</span>;'},
+  {t:'    <span class="kw">else if</span>(!<span class="fn">isalnum</span>(pw[i])) spec=<span class="num">1</span>;',note:"Special = not a letter or digit.",hl:true},
+  {t:'  }'},
+  {t:'  valid = (len&gt;=<span class="num">8</span> &amp;&amp; up &amp;&amp; dig &amp;&amp; spec);',hl:true},
+  {t:'} <span class="kw">while</span>(!valid);',note:"Keep prompting until every rule passes."}
+ ],
+ mem:{
+  title:"Testing \"weak\" then \"Strong1!\"",
+  vars:["pw","len","up","dig","spec","valid?"],
+  steps:[
+   {desc:"pw=\"weak\": len=4, up=0, dig=0, spec=0",set:{pw:"weak",len:"4",up:"0",dig:"0",spec:"0"},chg:["pw","len","up","dig","spec"]},
+   {desc:"valid = (4>=8 && ...) → false. Loop repeats.",set:{"valid?":"false"},chg:["valid?"]},
+   {desc:"pw=\"Strong1!\": len=8, up=1('S'), dig=1('1'), spec=1('!')",set:{pw:"Strong1!",len:"8",up:"1",dig:"1",spec:"1"},chg:["pw","len","up","dig","spec"]},
+   {desc:"valid = (8>=8 && 1 && 1 && 1) → <span class='exec'>true — accepted!</span>",set:{"valid?":"true"},chg:["valid?"]}
+  ]
+ },
+ output:[
+  {p:"Enter password: ",i:"weak"},{o:"Weak password, try again."},
+  {p:"Enter password: ",i:"Strong1!"},{o:"Password accepted!"}
+ ],
+ better:{
+  naive:"Never masks input (password shows on screen) and has no limit on failed attempts, which real systems would rate-limit.",
+  improvements:[
+   "<b>Mask input</b> in a real terminal application (requires platform-specific terminal handling, not portable scanf).",
+   "<b>Rate-limit attempts</b> to prevent brute-force guessing in an actual authentication system.",
+   "<b>Report which specific rule failed</b> (too short? no digit?) rather than a generic 'weak' message, improving usability."
+  ],
+  complexity:["Time: O(len) per attempt","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why is do-while more appropriate here than a plain while loop?",
+   opts:["Faster","There's no password to check before the first prompt — must run once","Syntax requirement","No difference"],ans:1,
+   exp:"<b>Must run once.</b> Before any input exists, there's nothing to validate, so the loop body (prompt + check) needs to execute unconditionally at least one time — do-while's exact purpose."},
+  {type:"spot-the-bug",q:"What does <code>!isalnum(pw[i])</code> detect?",
+   opts:["Uppercase letters","A special (non-alphanumeric) character","Digits only","Nothing"],ans:1,
+   exp:"<b>Special characters.</b> isalnum is true for letters and digits; negating it catches everything else — symbols, punctuation, etc."},
+  {type:"fill-in-the-blank",q:"The loop keeps repeating while the password is ____.",
+   answer:"invalid",exp:"do-while(!valid) continues as long as valid is false, i.e. the password fails a rule."}
+ ]
+},
+{
+ id:"pq41", unit:"Unit 2", tab:"Q41 · Reverse & palindrome",
+ title:"Reverse a number and check palindrome",
+ question:"Read digits one at a time (no arrays) and reconstruct the number, its reverse, and check palindrome.",
+ aim:"Peel digits with % and / to build the reversed number purely through arithmetic.",
+ file:"q41.c",
+ syntax:[
+  {tok:"rev = rev*10 + n%10", why:"Build the reverse digit by digit",
+   body:"Each iteration takes the last digit of the shrinking n and appends it to the growing rev — naturally reversing the digit order.",
+   trap:"Not preserving the original n (orig) means you'd lose the value needed for the final palindrome comparison."},
+  {tok:"n /= 10", why:"Shrink toward zero",
+   body:"Dividing by 10 drops the digit just consumed, moving toward the loop's termination when n reaches 0.",
+   trap:"Forgetting this creates an infinite loop — n never shrinks."},
+  {tok:"orig == rev", why:"Palindrome test",
+   body:"A number is a palindrome if it reads the same forwards and backwards — exactly what comparing the original to its digit-reversed twin checks.",
+   trap:"Comparing against the still-shrinking n instead of the preserved orig gives a meaningless comparison (n is 0 by the time the loop ends)."}
+ ],
+ code:[
+  {t:'<span class="ty">long</span> n=<span class="num">12321</span>, orig=n, rev=<span class="num">0</span>;',note:"Preserve orig before n gets consumed.",hl:true},
+  {t:'<span class="kw">while</span>(n&gt;<span class="num">0</span>){'},
+  {t:'  rev=rev*<span class="num">10</span>+n%<span class="num">10</span>;',note:"Append the last digit of n onto the growing rev.",hl:true},
+  {t:'  n/=<span class="num">10</span>;',note:"Drop the digit just consumed."},
+  {t:'}'},
+  {t:'<span class="fn">printf</span>(<span class="str">"Palindrome? %s\\n"</span>, orig==rev?<span class="str">"Yes"</span>:<span class="str">"No"</span>);',note:"Compare the preserved original to the built reverse.",hl:true}
+ ],
+ mem:{
+  title:"Reversing 12321",
+  vars:["n","digit","rev"],
+  steps:[
+   {desc:"n=12321, rev=0",set:{n:"12321",rev:"0"},chg:["n","rev"]},
+   {desc:"digit=1 (12321%10). rev=0*10+1=1. n=1232",set:{digit:"1",rev:"1",n:"1232"},chg:["digit","rev","n"]},
+   {desc:"digit=2. rev=1*10+2=12. n=123",set:{digit:"2",rev:"12",n:"123"},chg:["digit","rev","n"]},
+   {desc:"digit=3. rev=12*10+3=123. n=12",set:{digit:"3",rev:"123",n:"12"},chg:["digit","rev","n"]},
+   {desc:"digit=2. rev=1232. n=1",set:{digit:"2",rev:"1232",n:"1"},chg:["digit","rev","n"]},
+   {desc:"digit=1. rev=12321. n=0 → loop ends. <span class='exec'>orig==rev → palindrome!</span>",set:{digit:"1",rev:"12321",n:"0"},chg:["digit","rev","n"]}
+  ]
+ },
+ output:[{o:"Original:12321 Reverse:12321"},{o:"Palindrome? Yes"}],
+ better:{
+  naive:"Using plain int risks overflow for very large numbers when building rev; no handling for negative input.",
+  improvements:[
+   "<b>Use <code>long</code> or <code>long long</code></b> for rev to accommodate larger numbers without overflow.",
+   "<b>Handle negative numbers explicitly</b> — decide whether -121 should be treated as a palindrome of 121 or rejected outright.",
+   "<b>Guard against overflow</b> during the rebuild for numbers near the type's max value."
+  ],
+  complexity:["Time: O(d) for d digits","Space: O(1) — no array needed at all"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is the reverse of 12321?",
+   opts:["21321","12321","13221","Same, since it's a palindrome"],ans:3,
+   exp:"<b>Same — 12321.</b> It's a palindrome, so its digit-reversal equals itself."},
+  {type:"spot-the-bug",q:"Why store <code>orig=n</code> before the while loop?",
+   opts:["Unnecessary","n gets consumed down to 0 in the loop; orig preserves the value for the final comparison","Style","Speeds things up"],ans:1,
+   exp:"<b>Preserve for comparison.</b> By the time the loop ends, n is 0 — you need the untouched original to compare against rev."},
+  {type:"fill-in-the-blank",q:"Extract the last digit of n with <code>n ____ 10</code>.",
+   answer:"%",exp:"n % 10 yields the last (least significant) decimal digit."}
+ ]
+},
+{
+ id:"pq42", unit:"Unit 2", tab:"Q42 · Traffic light",
+ title:"Traffic light state machine",
+ question:"Simulate Green 60s/Yellow 5s/Red 45s with an emergency mode forcing all-red.",
+ aim:"Model states as data (arrays) and let a simple flag override the normal cycle.",
+ file:"q42.c",
+ syntax:[
+  {tok:"parallel arrays for state+duration", why:"Data-driven states",
+   body:"Storing state names and durations in matching-index arrays lets a single loop drive the whole cycle without repetitive if-chains per state.",
+   trap:"Keeping the arrays in sync manually is fragile — a struct pairing name+duration would be more robust (Unit 5 territory)."},
+  {tok:"emergency flag override", why:"Priority interrupt pattern",
+   body:"Checking a single <code>emergency</code> flag before running the normal cycle lets a special condition short-circuit the whole state machine — a common embedded-systems pattern.",
+   trap:"Not checking the flag at every relevant decision point means the emergency state might not actually take effect promptly."}
+ ],
+ code:[
+  {t:'<span class="ty">const char</span>* states[]={<span class="str">"GREEN"</span>,<span class="str">"YELLOW"</span>,<span class="str">"RED"</span>};'},
+  {t:'<span class="ty">int</span> durations[]={<span class="num">60</span>,<span class="num">5</span>,<span class="num">45</span>};',note:"Parallel array — index i's duration matches states[i]."},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">3</span>;i++) <span class="fn">printf</span>(<span class="str">"%s for %ds\\n"</span>, states[i], durations[i]);',note:"Single loop drives the whole normal cycle.",hl:true},
+  {t:'<span class="kw">if</span>(emergency) <span class="fn">printf</span>(<span class="str">"EMERGENCY MODE: all directions RED\\n"</span>);',note:"Priority override — bypasses the normal cycle entirely.",hl:true}
+ ],
+ mem:{
+  title:"Normal cycle then emergency trigger",
+  vars:["state","duration","emergency"],
+  steps:[
+   {desc:"i=0: GREEN for 60s",set:{state:"GREEN",duration:"60"},chg:["state","duration"]},
+   {desc:"i=1: YELLOW for 5s",set:{state:"YELLOW",duration:"5"},chg:["state","duration"]},
+   {desc:"i=2: RED for 45s",set:{state:"RED",duration:"45"},chg:["state","duration"]},
+   {desc:"emergency flag set to 1 → <span class='exec'>overrides normal cycle, forces all-red</span>",set:{emergency:"1"},chg:["emergency"]}
+  ]
+ },
+ output:[
+  {o:"Normal cycle:"},{o:"GREEN for 60s"},{o:"YELLOW for 5s"},{o:"RED for 45s"},
+  {o:"EMERGENCY MODE: all directions RED"}
+ ],
+ better:{
+  naive:"A real controller needs to actually wait/loop through the durations (this demo prints them once) and check for the emergency signal continuously, not just once.",
+  improvements:[
+   "<b>Use a real timer loop</b> (or hardware interrupt) to actually hold each state for its duration rather than just printing it.",
+   "<b>Poll the emergency flag inside the state loop</b> (not just after) so it can interrupt mid-cycle, not only between cycles.",
+   "<b>Model as an explicit state machine enum</b> (GREEN, YELLOW, RED, EMERGENCY) with defined transitions for clarity and safety-critical review."
+  ],
+  complexity:["Time: O(states) per cycle","Space: O(states) for the parallel arrays"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What do the parallel arrays states[] and durations[] achieve together?",
+   opts:["Nothing special","Each index pairs a state name with its duration, driven by one loop","Random duration","Sorting"],ans:1,
+   exp:"<b>Data-driven state cycle.</b> states[i] and durations[i] describe the same state, letting one loop handle all three without repetitive code."},
+  {type:"spot-the-bug",q:"What's the risk of only checking the emergency flag once, after the normal cycle prints?",
+   opts:["No risk","It might not interrupt promptly if it should override mid-cycle","Faster","Compile error"],ans:1,
+   exp:"<b>Delayed response.</b> A real emergency should interrupt immediately; checking only after finishing the normal print/cycle isn't responsive enough for a true safety-critical design."},
+  {type:"fill-in-the-blank",q:"In an emergency, all traffic directions should show ____.",
+   answer:"RED",exp:"All-red halts all directions safely during an emergency override."}
+ ]
+},
+{
+ id:"pq43", unit:"Unit 2", tab:"Q43 · Digital root",
+ title:"Digital root: iterative vs formula",
+ question:"Repeatedly sum digits until one remains. Derive the formula and verify it matches the iterative approach.",
+ aim:"Compute digital root two ways — brute-force iteration and the mod-9 shortcut — and prove they agree.",
+ file:"q43.c",
+ syntax:[
+  {tok:"nested while — sum then reduce", why:"Iterative digital root",
+   body:"Inner loop sums digits of n; outer loop repeats that summing until the result is a single digit (&lt;10).",
+   trap:"Forgetting the outer loop only sums once, which isn't enough for multi-round reduction (e.g. 9875 → 29 → 11 needs another pass)."},
+  {tok:"n%9 (with 9 special case)", why:"Closed-form shortcut",
+   body:"The digital root equals <code>n mod 9</code>, except when that's 0 and n isn't 0 itself — then the root is 9, not 0.",
+   trap:"Forgetting the zero-special-case makes multiples of 9 (like 18, 27) incorrectly compute a root of 0 instead of 9."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">digitalRoot</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">while</span>(n&gt;=<span class="num">10</span>){',note:"Keep reducing until single digit.",hl:true},
+  {t:'    <span class="ty">int</span> sum=<span class="num">0</span>; <span class="kw">while</span>(n){ sum+=n%<span class="num">10</span>; n/=<span class="num">10</span>; } n=sum;',note:"One pass of digit-summing.",hl:true},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> n;'},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">formulaRoot</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n==<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;'},
+  {t:'  <span class="ty">int</span> r=n%<span class="num">9</span>;'},
+  {t:'  <span class="kw">return</span> r==<span class="num">0</span>?<span class="num">9</span>:r;',note:"Special-case: multiples of 9 (except 0) have root 9, not 0.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Digital root of 9875 both ways",
+  vars:["n (iterative)","sum passes","formula r"],
+  steps:[
+   {desc:"Iterative: 9875 → digits sum 9+8+7+5=29",set:{"n (iterative)":"29"},chg:["n (iterative)"]},
+   {desc:"29 ≥ 10, sum again: 2+9=11",set:{"n (iterative)":"11"},chg:["n (iterative)"]},
+   {desc:"11 ≥ 10, sum again: 1+1=2. Now &lt;10, stop. <span class='exec'>Root = 2</span>",set:{"n (iterative)":"2"},chg:["n (iterative)"]},
+   {desc:"Formula: 9875 % 9 = 2 (since 9875 = 1097×9 + 2). Matches!",set:{"formula r":"2"},chg:["formula r"]}
+  ]
+ },
+ output:[{o:"Digital root of 9875: iterative=2 formula=2"},{o:"Verified match for 1..20"}],
+ better:{
+  naive:"The iterative version is intuitive but does redundant repeated work; it's still correct, just slower for very large numbers.",
+  improvements:[
+   "<b>Prefer the O(1) formula</b> in production — no need to loop at all once you know the mod-9 shortcut.",
+   "<b>Keep the iterative version for teaching</b> — it makes the 'why' of the formula concrete and verifiable.",
+   "<b>Extend to other bases</b>: the digital root shortcut generalizes to mod (base−1) for any positional number system."
+  ],
+  complexity:["Iterative: O(log n) digits, repeated a few times","Formula: O(1)","Space: O(1) both"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is the digital root of 18?",
+   opts:["0","9","18","1"],ans:1,exp:"<b>9.</b> 1+8=9, already a single digit. Also matches the formula: 18%9=0, but the zero-special-case makes it 9."},
+  {type:"spot-the-bug",q:"Why does formulaRoot special-case when <code>n%9==0</code>?",
+   opts:["No reason","Multiples of 9 (other than 0) have digital root 9, not 0","Bug in the code","Speeds it up"],ans:1,
+   exp:"<b>Root-9 exception.</b> 9, 18, 27... all reduce to digital root 9, but 9%9=0 — without the special case the formula would wrongly report 0."},
+  {type:"fill-in-the-blank",q:"The digital root formula is essentially n mod ____ (with a zero exception).",
+   answer:"9",exp:"Digital root = n mod 9, except when that's 0 for a nonzero n, in which case the root is 9."}
+ ]
+},
+{
+ id:"pq44", unit:"Unit 2", tab:"Q44 · Symmetric table",
+ title:"Exploiting symmetry in a multiplication table",
+ question:"An n×n multiplication table is symmetric across the diagonal. Print only the upper triangle and reconstruct the rest.",
+ aim:"Compute half the cells directly and mirror them into the other half, halving the real work.",
+ file:"q44.c",
+ syntax:[
+  {tok:"j starts at i (upper triangle)", why:"Only compute i≤j cells",
+   body:"Since <code>table[i][j] == table[j][i]</code> (both equal i×j), you only need to compute the upper triangle where <code>j≥i</code>.",
+   trap:"Looping j from 1 (not from i) recomputes the same values twice — no actual savings."},
+  {tok:"table[j][i] = table[i][j]", why:"Mirror across the diagonal",
+   body:"Every computed upper-triangle value is copied into its mirror position below the diagonal — one multiply serves two cells.",
+   trap:"Forgetting to mirror leaves the lower triangle uninitialized (garbage values) when you print the full table."}
+ ],
+ code:[
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;=n;i++)'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=i;j&lt;=n;j++){',note:"j starts at i — only the upper triangle is computed.",hl:true},
+  {t:'    table[i][j]=i*j;',note:"One multiply..."},
+  {t:'    table[j][i]=table[i][j];',note:"...serves both cells via mirroring.",hl:true},
+  {t:'  }'}
+ ],
+ mem:{
+  title:"Building a 5×5 table via upper triangle",
+  vars:["i,j","table[i][j]","table[j][i]"],
+  steps:[
+   {desc:"i=1,j=1: table[1][1]=1. Mirror: table[1][1]=1 (same cell)",set:{"i,j":"1,1","table[i][j]":"1"},chg:["i,j","table[i][j]"]},
+   {desc:"i=1,j=2: table[1][2]=2. Mirror: table[2][1]=2",set:{"i,j":"1,2","table[i][j]":"2","table[j][i]":"2"},chg:["i,j","table[i][j]","table[j][i]"]},
+   {desc:"i=2,j=3: table[2][3]=6. Mirror: table[3][2]=6 — <span class='exec'>one multiply, two cells filled</span>",set:{"i,j":"2,3","table[i][j]":"6","table[j][i]":"6"},chg:["i,j","table[i][j]","table[j][i]"]}
+  ]
+ },
+ output:[
+  {o:"  1   2   3   4   5"},{o:"  2   4   6   8  10"},{o:"  3   6   9  12  15"},
+  {o:"  4   8  12  16  20"},{o:"  5  10  15  20  25"},
+  {o:"Efficiency: computed 15 cells instead of 25 (roughly half)."}
+ ],
+ better:{
+  naive:"Computing all n² cells independently ignores the multiplication table's inherent symmetry, wasting half the multiplications.",
+  improvements:[
+   "<b>The upper-triangle-plus-mirror technique</b> (shown here) is the core optimization — roughly halves the arithmetic.",
+   "<b>Cache-friendliness</b>: for very large n, the mirrored write pattern (table[j][i]) jumps around memory — consider blocking/tiling for huge tables.",
+   "<b>Generalize</b>: any symmetric relation (table[i][j]==table[j][i]) benefits from this same upper-triangle trick, not just multiplication."
+  ],
+  complexity:["Naive: O(n²) multiplications","Optimized: O(n²/2) multiplications — same asymptotic order, real constant-factor savings"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why is a multiplication table symmetric across the diagonal?",
+   opts:["Coincidence","i×j always equals j×i (commutativity)","Only for square tables","It isn't always"],ans:1,
+   exp:"<b>Commutativity.</b> Multiplication doesn't care about order: i×j = j×i, so table[i][j] and table[j][i] are always equal."},
+  {type:"spot-the-bug",q:"What happens if you forget the mirroring line <code>table[j][i]=table[i][j]</code>?",
+   opts:["No difference","The lower triangle stays uninitialized (garbage) when printed","Compile error","Table becomes wrong size"],ans:1,
+   exp:"<b>Uninitialized cells.</b> Only the upper triangle gets real values; without mirroring, the lower triangle holds whatever garbage was in that memory."},
+  {type:"fill-in-the-blank",q:"Starting the inner loop at <code>j=____</code> instead of 1 is what limits computation to the upper triangle.",
+   answer:"i",exp:"j starting at i ensures only cells where j≥i (the upper triangle including diagonal) are computed directly."}
+ ]
+},
+{
+ id:"pq45", unit:"Unit 2", tab:"Q45 · Happy numbers",
+ title:"Detecting happy numbers with cycle detection",
+ question:"A number is happy if repeated sum-of-squares-of-digits reaches 1. Detect cycles using loop logic only (no arrays).",
+ aim:"Apply Floyd's cycle-detection (tortoise and hare) to spot non-happy numbers without storing history.",
+ file:"q45.c",
+ syntax:[
+  {tok:"sumSq helper", why:"The core transformation",
+   body:"Sum of squares of digits: 19 → 1²+9² = 82 → 8²+2² = 68 → ... This is the repeated operation being tested for convergence to 1.",
+   trap:"Reusing this correctly in both slow and fast pointers is what makes cycle detection possible without any storage."},
+  {tok:"slow/fast (tortoise/hare)", why:"Floyd's cycle detection, no array needed",
+   body:"slow advances one step, fast advances two. If there's a cycle (unhappy number), they eventually land on the same value — no need to remember every value seen.",
+   trap:"Forgetting this technique, a naive approach would need a growing array/set to detect 'have I seen this before', which the question explicitly disallows."},
+  {tok:"do-while(slow != fast)", why:"Run until they meet",
+   body:"They start equal (both = n), so the loop must execute at least once before comparing — another natural do-while case.",
+   trap:"Using plain while would immediately see slow==fast (both start at n) and exit without ever running."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">sumSq</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="ty">int</span> sum=<span class="num">0</span>; <span class="kw">while</span>(n){ <span class="ty">int</span> d=n%<span class="num">10</span>; sum+=d*d; n/=<span class="num">10</span>; } <span class="kw">return</span> sum;'},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">isHappy</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="ty">int</span> slow=n, fast=n;'},
+  {t:'  <span class="kw">do</span>{',note:"Must run once before slow/fast can possibly differ.",hl:true},
+  {t:'    slow = <span class="fn">sumSq</span>(slow);',note:"Tortoise: one step.",hl:true},
+  {t:'    fast = <span class="fn">sumSq</span>(<span class="fn">sumSq</span>(fast));',note:"Hare: two steps.",hl:true},
+  {t:'  } <span class="kw">while</span>(slow!=fast);',note:"They meet when a cycle exists (or both reach 1)."},
+  {t:'  <span class="kw">return</span> slow==<span class="num">1</span>;',note:"Happy only if they met AT 1, not some other cycle value."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Testing n=7 (a happy number)",
+  vars:["slow","fast"],
+  steps:[
+   {desc:"slow=7, fast=7 (start equal)",set:{slow:"7",fast:"7"},chg:["slow","fast"]},
+   {desc:"slow=sumSq(7)=49. fast=sumSq(sumSq(7))=sumSq(49)=97",set:{slow:"49",fast:"97"},chg:["slow","fast"]},
+   {desc:"slow=sumSq(49)=97. fast=sumSq(sumSq(97))=sumSq(130)=10",set:{slow:"97",fast:"10"},chg:["slow","fast"]},
+   {desc:"...eventually slow=fast=1 → <span class='exec'>Happy!</span>",set:{slow:"1",fast:"1"},chg:["slow","fast"]}
+  ]
+ },
+ output:[{o:"Happy numbers 1-20: 1 7 10 13 19"}],
+ better:{
+  naive:"A set/array-based 'have I seen this value' approach also works but violates the no-extra-storage constraint and uses O(cycle length) memory.",
+  improvements:[
+   "<b>Floyd's tortoise-and-hare</b> (used here) achieves O(1) space instead of O(cycle length) for a hash-set approach.",
+   "<b>Known fact</b>: all non-happy numbers eventually enter the same cycle (4→16→37→58→89→145→42→20→4...), so you could hardcode a check against that cycle instead of full cycle detection — a valid shortcut.",
+   "<b>Memoize happy/unhappy results</b> if you're checking many numbers repeatedly, since sub-sequences overlap heavily."
+  ],
+  complexity:["Time: O(cycle length) per number","Space: O(1) — the whole point of Floyd's algorithm"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why use two pointers (slow/fast) instead of storing every value seen?",
+   opts:["Faster typing","Detects cycles in O(1) space, without needing an array/set","Required by C","No real reason"],ans:1,
+   exp:"<b>O(1) space cycle detection.</b> Floyd's algorithm finds cycles without remembering history — exactly what 'no arrays' demands."},
+  {type:"spot-the-bug",q:"Why must this use do-while instead of while?",
+   opts:["No reason","slow and fast start equal, so a while loop would exit immediately without running","Style","Faster"],ans:1,
+   exp:"<b>Must run first.</b> Since slow==fast==n initially, checking the condition BEFORE the first step would immediately be true and skip the whole computation."},
+  {type:"fill-in-the-blank",q:"The loop ends when slow meets fast; the number is happy only if they meet at ____.",
+   answer:"1",exp:"Meeting at any other value means they've entered the well-known unhappy cycle instead."}
+ ]
+},
+{
+ id:"pq46", unit:"Unit 2", tab:"Q46 · Grade evaluation",
+ title:"Grade evaluation with if-else-if ladder",
+ question:"Compute totals, percentage, grade, and remarks for 5 subjects; identify boundary test cases.",
+ aim:"Chain if-else-if for grade bands and think carefully about the exact boundary values.",
+ file:"q46.c",
+ syntax:[
+  {tok:"if-else-if ladder (>= descending)", why:"Ordered boundary checks",
+   body:"Checking from the highest threshold down (&gt;=90, then &gt;=75, then &gt;=60) ensures each band is tested in the right order — the first true branch wins.",
+   trap:"Reversing the order (checking low thresholds first) would misclassify high scores into the wrong (lower) band."},
+  {tok:"total / 5.0", why:"Float division for percentage",
+   body:"Dividing by <code>5.0</code> (not <code>5</code>) forces floating-point division so the percentage isn't truncated to a whole number.",
+   trap:"<code>total/5</code> with both ints truncates the percentage, losing the decimal precision students actually care about."},
+  {tok:"boundary test cases", why:"Off-by-one is where bugs hide",
+   body:"Exact threshold values (89.99 vs 90.00, 59 vs 60) are where grading bugs most often surface — always test them explicitly.",
+   trap:"Testing only 'obviously A' or 'obviously F' scores misses the boundary bugs that actually matter."}
+ ],
+ code:[
+  {t:'<span class="ty">float</span> pct=total/<span class="num">5.0</span>;',note:"Float division — keeps the decimal.",hl:true},
+  {t:'<span class="kw">if</span>(pct&gt;=<span class="num">90</span>){ grade=<span class="str">\'A\'</span>; remark=<span class="str">"Excellent"</span>; }',note:"Highest threshold checked FIRST.",hl:true},
+  {t:'<span class="kw">else if</span>(pct&gt;=<span class="num">75</span>){ grade=<span class="str">\'B\'</span>; remark=<span class="str">"Good"</span>; }',hl:true},
+  {t:'<span class="kw">else if</span>(pct&gt;=<span class="num">60</span>){ grade=<span class="str">\'C\'</span>; remark=<span class="str">"Average"</span>; }',hl:true},
+  {t:'<span class="kw">else</span> { grade=<span class="str">\'F\'</span>; remark=<span class="str">"Needs Improvement"</span>; }'}
+ ],
+ mem:{
+  title:"Marks 85,90,78,92,88",
+  vars:["total","pct","grade"],
+  steps:[
+   {desc:"total = 85+90+78+92+88 = 433",set:{total:"433"},chg:["total"]},
+   {desc:"pct = 433/5.0 = 86.60",set:{pct:"86.60"},chg:["pct"]},
+   {desc:"86.60 &lt; 90, but ≥75 → <span class='exec'>Grade B, 'Good'</span>",set:{grade:"B"},chg:["grade"]}
+  ]
+ },
+ output:[{o:"Total:433 Percentage:86.60 Grade:B (Good)"}],
+ better:{
+  naive:"Hard-coded thresholds (90, 75, 60) scattered through the ladder make grade-scale changes error-prone across the codebase.",
+  improvements:[
+   "<b>Extract thresholds as named constants</b> so a grading-policy change touches one place, not several.",
+   "<b>Test boundary values explicitly</b>: exactly 90.00, 89.99, 75.00, 74.99, 60.00, 59.99 — these are the real risk zone for off-by-one bugs.",
+   "<b>Consider a table-driven approach</b> (array of {threshold, grade, remark}) for grade scales with many more bands."
+  ],
+  complexity:["Time: O(1) per student, O(bands) worst case for the ladder","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"A student scores exactly 60.00%. What grade do they get?",
+   opts:["F","C","B","Depends on rounding"],ans:1,
+   exp:"<b>C.</b> The check is <code>pct&gt;=60</code>, and 60.00 satisfies that exactly, landing in the C band (not F)."},
+  {type:"spot-the-bug",q:"Why must the ladder check &gt;=90 BEFORE &gt;=75?",
+   opts:["No reason, order doesn't matter","Checking low thresholds first would misclassify high scores","Compiler requires it","Faster"],ans:1,
+   exp:"<b>Order matters.</b> If &gt;=60 were checked first, a 95% score would match it (95≥60) and incorrectly get graded C before ever reaching the A check."},
+  {type:"fill-in-the-blank",q:"The most valuable test cases for a grading ladder are the exact ____ values.",
+   answer:"boundary",exp:"Boundary values (like exactly 90.00 or 89.99) are where off-by-one grading bugs actually hide."}
+ ]
+},
+{
+ id:"pq47", unit:"Unit 2", tab:"Q47 · a>b>c bug",
+ title:"The if(a > b > c) trap",
+ question:"Is <code>if(a > b > c)</code> valid C? What does it actually compute, and how do you fix it?",
+ aim:"See how chained comparisons are silently reinterpreted through left-to-right evaluation and boolean coercion.",
+ file:"q47.c",
+ syntax:[
+  {tok:"a > b > c chaining", why:"NOT mathematical range checking",
+   body:"C evaluates left to right: <code>(a&gt;b)</code> first, producing 0 or 1. Then that result is compared to <code>c</code> — a completely different question than 'is b between a and c'.",
+   trap:"Many languages (Python) support true chained comparisons; C does not — this syntax silently compiles to something else entirely."},
+  {tok:"(a>b) yields 0 or 1", why:"Boolean-to-int coercion",
+   body:"The first comparison's result is just an int (0 or 1), which then gets compared against c using ordinary numeric comparison.",
+   trap:"With a=10,b=5,c=1: (10&gt;5)=1, then 1&gt;1 is FALSE — even though b genuinely IS between a and c!"},
+  {tok:"b>c && b<a (the fix)", why:"Explicit range check",
+   body:"To truly test 'is b between a and c', you need two separate comparisons joined by <code>&amp;&amp;</code> — there's no shortcut chained syntax in C.",
+   trap:"Forgetting one half of the range (only checking b&lt;a, not b&gt;c) allows out-of-range values through."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> a=<span class="num">10</span>,b=<span class="num">5</span>,c=<span class="num">1</span>;'},
+  {t:'<span class="kw">if</span>(a&gt;b&gt;c) <span class="fn">printf</span>(<span class="str">"TRUE\\n"</span>); <span class="kw">else</span> <span class="fn">printf</span>(<span class="str">"FALSE\\n"</span>);',note:"(a>b) is 1. Then 1>c is 1>1, which is FALSE. Misleading!",hl:true},
+  {t:'<span class="kw">if</span>(b&gt;c &amp;&amp; b&lt;a) <span class="fn">printf</span>(<span class="str">"b is between a and c\\n"</span>);',note:"The CORRECT way to test a range in C.",hl:true},
+  {t:'<span class="kw">else</span> <span class="fn">printf</span>(<span class="str">"b is not between\\n"</span>);'}
+ ],
+ mem:{
+  title:"a=10, b=5, c=1 — the chained trap",
+  vars:["a>b","(a>b)>c","b>c && b<a"],
+  steps:[
+   {desc:"a>b: 10>5 → 1 (true)",set:{"a>b":"1"},chg:["a>b"]},
+   {desc:"That result (1) compared to c: 1>1 → <span class='exec'>FALSE</span> — misleading!",set:{"(a>b)>c":"false"},chg:["(a>b)>c"]},
+   {desc:"Correct range check: b>c is 5>1=true, b<a is 5<10=true. Both true → <span class='exec'>TRUE, b really is between</span>",set:{"b>c && b<a":"true"},chg:["b>c && b<a"]}
+  ]
+ },
+ output:[{o:"Bug version: FALSE (misleading)"},{o:"Correct version: b is between a and c"}],
+ better:{
+  naive:"The chained syntax compiles cleanly with no warning, making this an especially dangerous silent bug.",
+  improvements:[
+   "<b>Never chain comparisons in C</b> — always use explicit <code>&&</code> for range checks.",
+   "<b>Enable strict compiler warnings</b> — some static analyzers flag chained relational operators as suspicious.",
+   "<b>If coming from Python</b>, remember C has no true chained comparison syntax — this is one of the most common cross-language transfer bugs."
+  ],
+  complexity:["Time: O(1)","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"With a=10,b=5,c=1, what does <code>a>b>c</code> actually evaluate to?",
+   opts:["True — b is between a and c","False — (a>b) becomes 1, then 1>c is false","Compile error","Depends on types"],ans:1,
+   exp:"<b>False, misleadingly.</b> a>b evaluates first (true→1), then that 1 is compared to c: 1>1 is false — even though b genuinely sits between a and c."},
+  {type:"spot-the-bug",q:"What is the correct C way to check 'b is between a and c' (a>c)?",
+   opts:["a>b>c","b>c && b<a","b>c || b<a","a>b && a>c"],ans:1,
+   exp:"<b>b>c && b<a.</b> Two explicit comparisons joined by AND properly express the range check that chained syntax can't."},
+  {type:"fill-in-the-blank",q:"In C, chained comparisons like a>b>c are legal syntax but almost never do what you ____.",
+   answer:"intend",exp:"They compile and run, but silently compute something different from a true range check — a classic 'looks right, isn't' bug."}
+ ]
+},
+{
+ id:"pq48", unit:"Unit 2", tab:"Q48 · Shell interpreter",
+ title:"A simple command interpreter loop",
+ question:"Accept 'add X Y', 'mul X Y', 'quit' commands; parse without a string library; handle unknown commands.",
+ aim:"Use scanf's tokenizing to read a command word, then branch and read its operands.",
+ file:"q48.c",
+ syntax:[
+  {tok:"scanf(\"%99s\",cmd)", why:"Reads one whitespace-delimited token",
+   body:"<code>%s</code> naturally stops at whitespace, so it reads exactly one word (the command) per call — no manual tokenizing needed.",
+   trap:"Not bounding the width (<code>%99s</code> vs bare <code>%s</code>) risks a buffer overflow on unexpectedly long input."},
+  {tok:"strcmp dispatch", why:"Compare the command string",
+   body:"<code>strcmp(cmd,\"add\")==0</code> checks which command was typed, branching to read the right number of operands for that command.",
+   trap:"Using <code>==</code> on the char arrays instead of strcmp would compare addresses, not content — always false."},
+  {tok:"infinite loop + break on quit", why:"REPL pattern",
+   body:"<code>while(1)</code> keeps accepting commands until the user types 'quit', which explicitly breaks — a minimal read-eval-print loop.",
+   trap:"Forgetting to check scanf's return value means malformed/EOF input could spin the loop unexpectedly."}
+ ],
+ code:[
+  {t:'<span class="kw">while</span>(<span class="num">1</span>){',note:"REPL: read-eval-print loop.",hl:true},
+  {t:'  <span class="kw">if</span>(<span class="fn">scanf</span>(<span class="str">"%99s"</span>,cmd)!=<span class="num">1</span>) <span class="kw">break</span>;',note:"Bounded read; stop cleanly on EOF/bad input."},
+  {t:'  <span class="kw">if</span>(<span class="fn">strcmp</span>(cmd,<span class="str">"quit"</span>)==<span class="num">0</span>){ <span class="fn">printf</span>(<span class="str">"Bye.\\n"</span>); <span class="kw">break</span>; }',note:"Compare CONTENT with strcmp, not addresses.",hl:true},
+  {t:'  <span class="kw">else if</span>(<span class="fn">strcmp</span>(cmd,<span class="str">"add"</span>)==<span class="num">0</span>){ <span class="ty">int</span> x,y; <span class="fn">scanf</span>(<span class="str">"%d %d"</span>,&amp;x,&amp;y); <span class="fn">printf</span>(<span class="str">"= %d\\n"</span>,x+y); }',hl:true},
+  {t:'  <span class="kw">else if</span>(<span class="fn">strcmp</span>(cmd,<span class="str">"mul"</span>)==<span class="num">0</span>){ <span class="ty">int</span> x,y; <span class="fn">scanf</span>(<span class="str">"%d %d"</span>,&amp;x,&amp;y); <span class="fn">printf</span>(<span class="str">"= %d\\n"</span>,x*y); }'},
+  {t:'  <span class="kw">else</span> <span class="fn">printf</span>(<span class="str">"Unknown command: %s\\n"</span>, cmd);',note:"Unrecognized commands handled gracefully, not crashed."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Commands: add 3 4, mul 5 6, foo, quit",
+  vars:["cmd","x","y","result"],
+  steps:[
+   {desc:"cmd=\"add\", reads x=3,y=4. result=3+4=7",set:{cmd:"add",x:"3",y:"4",result:"7"},chg:["cmd","x","y","result"]},
+   {desc:"cmd=\"mul\", reads x=5,y=6. result=5*6=30",set:{cmd:"mul",x:"5",y:"6",result:"30"},chg:["cmd","x","y","result"]},
+   {desc:"cmd=\"foo\" — no match → <span class='exec'>'Unknown command: foo'</span>",set:{cmd:"foo"},chg:["cmd"]},
+   {desc:"cmd=\"quit\" → prints Bye, breaks loop",set:{cmd:"quit"},chg:["cmd"]}
+  ]
+ },
+ output:[
+  {o:"> = 7"},{o:"> = 30"},{o:"> Unknown command: foo"},{o:"> Bye."}
+ ],
+ better:{
+  naive:"Adding a new command requires another else-if branch; operand count is hardcoded per command with no validation.",
+  improvements:[
+   "<b>Use a command table</b> (array of {name, handler function pointer}) instead of an else-if chain for easier extension.",
+   "<b>Validate operand reads</b> — check scanf's return value when reading x,y so malformed input doesn't silently use garbage.",
+   "<b>Support variable argument counts</b> if commands might take different numbers of operands in the future."
+  ],
+  complexity:["Time: O(1) per command (O(commands) for the else-if chain worst case)","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For command 'add 3 4', what does the interpreter print?",
+   opts:["7","34","= 7","Error"],ans:2,exp:"<b>= 7.</b> The printf format is <code>\"= %d\\n\"</code>, so it prints '= 7' exactly."},
+  {type:"spot-the-bug",q:"Why use strcmp(cmd,\"quit\")==0 instead of cmd==\"quit\"?",
+   opts:["No difference","cmd==\"quit\" compares addresses, not string content","Faster","Required syntax"],ans:1,
+   exp:"<b>Content vs address.</b> == on char arrays/pointers compares memory addresses, which will essentially never match; strcmp compares actual characters."},
+  {type:"fill-in-the-blank",q:"An unrecognized command should be handled ____, not crash the program.",
+   answer:"gracefully",exp:"The else branch prints 'Unknown command' and continues the loop rather than crashing or undefined behavior."}
+ ]
+},
+{
+ id:"pq49", unit:"Unit 2", tab:"Q49 · for(;;) vs while(1)",
+ title:"for(;;) and the empty for-clauses",
+ question:"What do the empty expressions in <code>for(;;){}</code> mean to the compiler? Compare with while(1).",
+ aim:"Understand that omitted for-loop clauses default to 'always true' for the condition, and no-op for init/increment.",
+ file:"q49.c",
+ syntax:[
+  {tok:"for(;;)", why:"All three clauses omitted",
+   body:"C's for-loop grammar allows any of the three clauses (init; condition; increment) to be empty. An empty condition is specifically defined to mean 'always true'.",
+   trap:"Assuming an empty condition means 'always false' or is a syntax error — it's neither; it's specifically true by the standard's definition."},
+  {tok:"while(1)", why:"Explicitly true condition",
+   body:"Functionally identical to <code>for(;;)</code> — both loop forever until an explicit <code>break</code> or <code>return</code>. Pure style preference between them.",
+   trap:"Believing one is 'more correct' or faster than the other — compilers optimize both identically."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> count=<span class="num">0</span>;'},
+  {t:'<span class="kw">for</span>(;;){',note:"Empty init, empty condition (=true), empty increment.",hl:true},
+  {t:'  count++;'},
+  {t:'  <span class="kw">if</span>(count&gt;=<span class="num">3</span>) <span class="kw">break</span>;'},
+  {t:'}'},
+  {t:'<span class="cm">// Identical behavior to: while(1){ count++; if(count>=3) break; }</span>',hl:true}
+ ],
+ mem:{
+  title:"for(;;) running 3 times then breaking",
+  vars:["count"],
+  steps:[
+   {desc:"count=0. Enter loop (condition is implicitly true — always).",set:{count:"0"},chg:["count"]},
+   {desc:"count++ → 1. Not ≥3, loop continues (no increment clause to run — it's empty).",set:{count:"1"},chg:["count"]},
+   {desc:"count++ → 2. Still continues.",set:{count:"2"},chg:["count"]},
+   {desc:"count++ → 3. 3≥3 → <span class='exec'>break</span>",set:{count:"3"},chg:["count"]}
+  ]
+ },
+ output:[{o:"for(;;) ran 3 times (equivalent to while(1))"}],
+ better:{
+  naive:"Neither form is 'better' technically — but consistency across a codebase (picking one and sticking with it) matters more than which one.",
+  improvements:[
+   "<b>Pick a team convention</b> and use it consistently — mixing both styles in one codebase is a minor but real readability tax.",
+   "<b>Use while(1)</b> if your team finds it more explicitly readable as 'infinite loop'.",
+   "<b>Use for(;;)</b> if your codebase leans on for-loops generally and wants visual consistency with other loop headers."
+  ],
+  complexity:["Time: O(1) per iteration, loop itself runs until break","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What does an empty condition clause in a for-loop mean to the compiler?",
+   opts:["Syntax error","Always false","Always true","Undefined behaviour"],ans:2,
+   exp:"<b>Always true.</b> The C standard specifically defines an omitted condition expression in a for-loop as evaluating to true."},
+  {type:"spot-the-bug",q:"Is for(;;) functionally different from while(1)?",
+   opts:["Yes, for(;;) is faster","No — they're functionally identical infinite loops","while(1) is deprecated","for(;;) is illegal in C"],ans:1,
+   exp:"<b>Identical.</b> Both loop forever until broken out of explicitly; the choice between them is purely stylistic."},
+  {type:"fill-in-the-blank",q:"for(;;) has ____ clauses explicitly written (init, condition, increment all omitted).",
+   answer:"0",exp:"All three clauses are empty — C allows this, defaulting the condition to always-true."}
+ ]
+},
+{
+ id:"pq50", unit:"Unit 2", tab:"Q50 · Spiral order",
+ title:"Spiral matrix order without 2D array indexing tricks",
+ question:"Generate spiral order of an n×n matrix using only loops and arithmetic. Trace n=4 and generalize.",
+ aim:"Track shrinking boundaries (top, bottom, left, right) and walk each edge in turn.",
+ file:"q50.c",
+ syntax:[
+  {tok:"top/bottom/left/right boundaries", why:"Four shrinking edges",
+   body:"Each of the four boundary variables marks the current unfilled rectangle's edge. After completing one edge, that boundary shrinks inward.",
+   trap:"Forgetting to shrink a boundary after its edge is walked causes the spiral to re-visit already-filled cells."},
+  {tok:"four directional loops per round", why:"Right, down, left, up",
+   body:"Each 'round' of the while walks: left→right along top, top→bottom along right, right→left along bottom, bottom→top along left — then all four boundaries shrink.",
+   trap:"Not guarding each inner loop with <code>val&lt;=total</code> can overshoot when n is odd (the very last cell is a single point, not a full edge)."},
+  {tok:"while(val<=total)", why:"Outer loop until the matrix is full",
+   body:"The whole spiral-filling process repeats rounds until every cell (n×n of them) has been assigned a value.",
+   trap:"For odd n, the innermost round can degenerate to a single cell or line — the <code>val&lt;=total</code> guards on every inner loop prevent overshooting."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> top=<span class="num">0</span>,bottom=n-<span class="num">1</span>,left=<span class="num">0</span>,right=n-<span class="num">1</span>, val=<span class="num">1</span>;',note:"Four shrinking boundaries define the unfilled rectangle.",hl:true},
+  {t:'<span class="kw">while</span>(val&lt;=total){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=left;j&lt;=right &amp;&amp; val&lt;=total;j++) mat[top][j]=val++;',note:"Walk right along the top row.",hl:true},
+  {t:'  top++;',note:"Top boundary shrinks inward."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=top;i&lt;=bottom &amp;&amp; val&lt;=total;i++) mat[i][right]=val++;',note:"Walk down along the right column."},
+  {t:'  right--;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> j=right;j&gt;=left &amp;&amp; val&lt;=total;j--) mat[bottom][j]=val++;',note:"Walk left along the bottom row."},
+  {t:'  bottom--;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=bottom;i&gt;=top &amp;&amp; val&lt;=total;i--) mat[i][left]=val++;',note:"Walk up along the left column."},
+  {t:'  left++;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Spiraling a 4×4 matrix",
+  vars:["top","bottom","left","right","val"],
+  steps:[
+   {desc:"Start: top=0,bottom=3,left=0,right=3, val=1",set:{top:"0",bottom:"3",left:"0",right:"3",val:"1"},chg:["top","bottom","left","right","val"]},
+   {desc:"Walk top row (right): 1,2,3,4 fill row 0. val=5. top→1",set:{val:"5",top:"1"},chg:["val","top"]},
+   {desc:"Walk right col (down): 5,6,7 fill column 3 rows 1-3. val=8. right→2",set:{val:"8",right:"2"},chg:["val","right"]},
+   {desc:"Walk bottom row (left): 8,9,10 fill row 3. val=11. bottom→2",set:{val:"11",bottom:"2"},chg:["val","bottom"]},
+   {desc:"Walk left col (up): 11 fills [2][0]. val=12. left→1. Inner spiral continues...",set:{val:"12",left:"1"},chg:["val","left"]}
+  ]
+ },
+ output:[
+  {o:"Spiral order 4x4:"},
+  {o:"  1   2   3   4"},{o:" 12  13  14   5"},{o:" 11  16  15   6"},{o:" 10   9   8   7"}
+ ],
+ better:{
+  naive:"Fine for teaching, but the four repeated loop patterns (right/down/left/up) are essentially duplicated logic that could be unified.",
+  improvements:[
+   "<b>Unify direction handling</b> with a direction-vector array (dx,dy pairs) and a single loop that changes direction on hitting a boundary — reduces 4 near-identical loops to 1.",
+   "<b>Verify with odd n</b> (like 5) where the very last cell is a single point, not a full edge — the val&lt;=total guards handle this correctly but deserve an explicit test.",
+   "<b>Support non-square matrices</b> (m×n) by tracking row/column bounds independently rather than assuming n×n."
+  ],
+  complexity:["Time: O(n²) — every cell visited exactly once","Space: O(n²) for the output matrix (O(1) extra beyond that)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What's the first number in the spiral, and where does the LAST land for a 4×4?",
+   opts:["1 at top-left, 16 at center","1 at top-left, 16 at [2][1]","16 at top-left, 1 at center","Random order"],ans:1,
+   exp:"<b>1 starts top-left; 16 lands at [2][1]</b> — the very center of the inward spiral for this 4×4 case."},
+  {type:"spot-the-bug",q:"Why guard every inner loop with <code>val<=total</code>?",
+   opts:["Unnecessary","Prevents overshooting when the remaining unfilled region is smaller than a full edge","Speeds up the loop","Required syntax"],ans:1,
+   exp:"<b>Prevents overshoot.</b> As the spiral tightens, remaining edges can be shorter than a full side (especially for odd n) — the guard stops writing once every cell is filled."},
+  {type:"fill-in-the-blank",q:"After completing the top-row walk, the ____ boundary shrinks inward (increments).",
+   answer:"top",exp:"top++ moves the top boundary down, since that row is now completely filled."}
+ ]
+}
+);
 
 </script>
 <script>
 /* ================= C-LAB APP ================= */
-const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: [], 3: [], 4: [], 5: [] };
+const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: [], 4: [], 5: [] };
 const UNIT_RANGES = {1:"1–25",2:"26–50",3:"51–75",4:"76–100",5:"101–125"};
 
 const state = { mode:'lab', unit:1, active:0, done:new Set(), quizScore:0, quizMax:0, quizAnswered:new Set() };
