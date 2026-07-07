@@ -5295,11 +5295,1545 @@ PRACTICE_U3.push(
  ]
 }
 );
+/* ===== PRACTICE QUESTIONS — UNIT 4 (Q76–88) ===== */
+const PRACTICE_U4 = [
+{
+ id:"pq76", unit:"Unit 4", tab:"Q76 · Fibonacci memo",
+ title:"Fibonacci: naive recursion vs memoization",
+ question:"Compute fib(n) recursively; analyze complexity; re-implement with memoization using a global array.",
+ aim:"See the exponential call explosion of naive recursion collapse to linear with a memo cache.",
+ file:"q76.c",
+ syntax:[
+  {tok:"naive fib(n-1)+fib(n-2)", why:"Exponential recomputation",
+   body:"Each call spawns two more, recomputing the SAME sub-values repeatedly. fib(30) naive makes over a million calls for a result under a million.",
+   trap:"It's correct, just catastrophically slow — the bug isn't wrongness, it's wasted work."},
+  {tok:"computed[] flag array", why:"Cache hit detection",
+   body:"Before computing fib(n), check if it's already been computed. If so, return the cached value instantly instead of recursing.",
+   trap:"Forgetting to check the cache first defeats the whole point — you'd still recompute everything."},
+  {tok:"memo[n] = fibMemo(n-1)+fibMemo(n-2)", why:"Store AND return in one expression",
+   body:"The assignment happens inside the return statement — memo[n] is set to the sum, and that same value is what's returned.",
+   trap:"Forgetting to actually STORE the result (just returning it without caching) means every call still recomputes."}
+ ],
+ code:[
+  {t:'<span class="ty">long</span> <span class="fn">fibNaive</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n&lt;=<span class="num">1</span>) <span class="kw">return</span> n;'},
+  {t:'  <span class="kw">return</span> <span class="fn">fibNaive</span>(n-<span class="num">1</span>)+<span class="fn">fibNaive</span>(n-<span class="num">2</span>);',note:"Recomputes overlapping subproblems endlessly.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">long</span> memo[<span class="num">50</span>]; <span class="ty">int</span> computed[<span class="num">50</span>]={<span class="num">0</span>};'},
+  {t:'<span class="ty">long</span> <span class="fn">fibMemo</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n&lt;=<span class="num">1</span>) <span class="kw">return</span> n;'},
+  {t:'  <span class="kw">if</span>(computed[n]) <span class="kw">return</span> memo[n];',note:"Cache hit — skip recursion entirely.",hl:true},
+  {t:'  computed[n]=<span class="num">1</span>;'},
+  {t:'  <span class="kw">return</span> memo[n]=<span class="fn">fibMemo</span>(n-<span class="num">1</span>)+<span class="fn">fibMemo</span>(n-<span class="num">2</span>);',note:"Store result AND return it in one line.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Computing fib(10) two ways — call counts",
+  vars:["n","naive calls","memo calls"],
+  steps:[
+   {desc:"fibNaive(10) recurses into fib(9) and fib(8), each recursing further — massive overlap",set:{n:"10","naive calls":"177 total"},chg:["n","naive calls"]},
+   {desc:"fibMemo(10): first call to fib(5) computes and caches it; later calls to fib(5) hit the cache instantly",set:{"memo calls":"19 total"},chg:["memo calls"]},
+   {desc:"Both return the same answer (55), but <span class='exec'>naive takes ~9x more calls</span> for just n=10 — the gap widens exponentially for larger n",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"fib(10) naive = 55 (calls=177)"},
+  {o:"fib(10) memo  = 55 (calls=19)"}
+ ],
+ better:{
+  naive:"The naive version's call count grows exponentially (~1.6^n) — fib(40) would take billions of calls and effectively never finish.",
+  improvements:[
+   "<b>Memoization</b> (shown here) turns exponential time into linear O(n) — the standard fix for overlapping-subproblem recursion.",
+   "<b>Bottom-up (iterative) DP</b> avoids recursion overhead entirely: build fib[0..n] in a simple loop, using O(1) extra space if you only keep the last two values.",
+   "<b>For very large n</b>, matrix exponentiation computes fib(n) in O(log n) time — beyond the scope here, but the natural next optimization."
+  ],
+  complexity:["Naive: O(2^n) time, O(n) space (call stack)","Memoized: O(n) time, O(n) space (cache + stack)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Roughly how many calls does naive fib(10) make compared to memoized fib(10)?",
+   opts:["Same number","Naive makes far more (177 vs 19)","Memo makes more","Both are O(1)"],ans:1,
+   exp:"<b>Naive makes far more.</b> 177 vs 19 — and the gap grows exponentially larger as n increases."},
+  {type:"spot-the-bug",q:"What happens if you forget to check <code>computed[n]</code> before recursing in fibMemo?",
+   opts:["No difference","You lose the memoization benefit — it degrades back to naive recursion","Compile error","Faster"],ans:1,
+   exp:"<b>Defeats the cache.</b> Without checking first, every call recomputes from scratch, exactly like the naive version — the array becomes pointless."},
+  {type:"fill-in-the-blank",q:"Memoization turns the naive O(2^n) time complexity into O(____).",
+   answer:"n",exp:"Each of the n distinct subproblems is computed exactly once, giving linear time."}
+ ]
+},
+{
+ id:"pq77", unit:"Unit 4", tab:"Q77 · Partition array",
+ title:"Partition an array into evens then odds",
+ question:"<code>int mystery(int *a, int n)</code> partitions in-place so all evens come before odds, no auxiliary array.",
+ aim:"Use two pointers converging from both ends, swapping misplaced elements as they go.",
+ file:"q77.c",
+ syntax:[
+  {tok:"left/right two-pointer convergence", why:"In-place partition, single pass",
+   body:"left advances past evens, right retreats past odds. When both are 'stuck' (left has an odd, right has an even), swap them.",
+   trap:"Forgetting to re-check <code>left&lt;right</code> inside the inner while loops can let the pointers cross and read out of bounds."},
+  {tok:"%2==0 as the partition test", why:"Even/odd classification",
+   body:"The modulo test decides which side of the partition an element belongs on — the same test drives both the left and right scans.",
+   trap:"Using <code>%2==1</code> for odd detection fails for negative numbers in some languages, though C's <code>%</code> still works correctly here for this even/odd check specifically."},
+  {tok:"return left (partition point)", why:"Report where the split happened",
+   body:"After partitioning, <code>left</code> marks the boundary index — everything before it is even, everything from it onward is odd.",
+   trap:"The caller needs this boundary if they want to process the two groups separately; forgetting to return it loses that information."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">mystery</span>(<span class="ty">int</span> *a, <span class="ty">int</span> n){'},
+  {t:'  <span class="ty">int</span> left=<span class="num">0</span>, right=n-<span class="num">1</span>;'},
+  {t:'  <span class="kw">while</span>(left&lt;right){'},
+  {t:'    <span class="kw">while</span>(left&lt;right &amp;&amp; a[left]%<span class="num">2</span>==<span class="num">0</span>) left++;',note:"Skip past evens already in place on the left.",hl:true},
+  {t:'    <span class="kw">while</span>(left&lt;right &amp;&amp; a[right]%<span class="num">2</span>==<span class="num">1</span>) right--;',note:"Skip past odds already in place on the right.",hl:true},
+  {t:'    <span class="kw">if</span>(left&lt;right){ <span class="cm">swap a[left],a[right]</span>; left++; right--; }',note:"Both stuck — swap the misplaced pair.",hl:true},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> left; <span class="cm">// partition point</span>'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Partitioning [1,2,3,4,5,6,7,8]",
+  vars:["left","right","a[left]","a[right]"],
+  steps:[
+   {desc:"left=0(val 1, odd, stuck), right=7(val 8, even, stuck) → swap",set:{left:"0",right:"7","a[left]":"1→8","a[right]":"8→1"},chg:["left","right","a[left]","a[right]"]},
+   {desc:"left=1(val 2, even, advances), left=2(val 3, odd, stuck). right=6(val 7, odd, retreats), right=5(val 6, even, stuck) → swap",set:{left:"2",right:"5"},chg:["left","right"]},
+   {desc:"...continues until left meets right. <span class='exec'>Final: [8,2,6,4,5,3,7,1]</span> — evens grouped left, odds right",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Before: 1 2 3 4 5 6 7 8"},
+  {o:"After (evens then odds): 8 2 6 4 5 3 7 1"},
+  {o:"Partition index: 4"}
+ ],
+ better:{
+  naive:"This is already the optimal in-place approach; a naive version using a second array to collect evens then odds would use O(n) extra space unnecessarily.",
+  improvements:[
+   "<b>The two-pointer technique</b> (shown here) achieves O(n) time and O(1) space — the natural optimal solution.",
+   "<b>Note it doesn't preserve relative order</b> within each group (not 'stable') — if order matters, a stable partition needs different logic (e.g. two passes with an auxiliary array).",
+   "<b>This exact pattern</b> generalizes to any binary partition predicate — not just even/odd, but any 'classify into two groups' problem."
+  ],
+  complexity:["Time: O(n) — each element visited a constant number of times","Space: O(1) — in-place, no auxiliary array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After partitioning [1,2,3,4,5,6,7,8], are evens and odds each in their original relative order?",
+   opts:["Yes, fully preserved","No — the two-pointer swap approach doesn't guarantee stability","Only evens preserved","Only odds preserved"],ans:1,
+   exp:"<b>Not necessarily preserved.</b> The swapping approach groups evens/odds correctly but doesn't guarantee their original relative order within each group — that's the tradeoff for O(1) space."},
+  {type:"spot-the-bug",q:"Why must both inner while loops check <code>left<right</code> in addition to the even/odd test?",
+   opts:["Unnecessary","Without it, left and right could cross and read out of array bounds","Style only","Faster"],ans:1,
+   exp:"<b>Bounds safety.</b> If every remaining element happened to satisfy the inner condition, the pointers could run past each other without the extra check, causing out-of-bounds access."},
+  {type:"fill-in-the-blank",q:"The function returns ____ , marking the boundary between the even and odd groups.",
+   answer:"left",exp:"After partitioning completes, left (which equals right at that point) is the split index."}
+ ]
+},
+{
+ id:"pq78", unit:"Unit 4", tab:"Q78 · Recursive reverse",
+ title:"Reverse a string in-place using pointers, recursively",
+ question:"No loops, no extra array — reverse via recursion and pointer swaps. Trace 'hello'; find max recursion depth.",
+ aim:"Swap the outer characters, then recurse inward on the remaining substring bounds.",
+ file:"q78.c",
+ syntax:[
+  {tok:"left/right index parameters", why:"Track the shrinking window",
+   body:"Rather than an extra array, the function just narrows a [left,right] window on the SAME string each recursive call, swapping the endpoints.",
+   trap:"Forgetting the base case (<code>left&gt;=right</code>) causes infinite recursion — there's no natural loop to fall out of."},
+  {tok:"single char swap per call", why:"One pair of positions per level",
+   body:"Each recursive call handles exactly one swap (the current outermost pair), then delegates the rest of the work to the next recursive call.",
+   trap:"Swapping BOTH ends AND still trying to recurse over the whole remaining string (not narrowing bounds) would redo work."},
+  {tok:"recursion depth = n/2", why:"Half the string length",
+   body:"Since each call handles one pair and moves inward by one on each side, a string of length n needs about n/2 recursive calls to fully reverse.",
+   trap:"For very long strings, n/2 levels of recursion could risk stack overflow — an iterative version avoids this entirely."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">reverseInPlace</span>(<span class="ty">char</span> *s, <span class="ty">int</span> left, <span class="ty">int</span> right){'},
+  {t:'  <span class="kw">if</span>(left&gt;=right) <span class="kw">return</span>;',note:"Base case: pointers met or crossed — done.",hl:true},
+  {t:'  <span class="ty">char</span> t=s[left]; s[left]=s[right]; s[right]=t;',note:"Swap the current outermost pair.",hl:true},
+  {t:'  <span class="fn">reverseInPlace</span>(s, left+<span class="num">1</span>, right-<span class="num">1</span>);',note:"Recurse inward — one level closer to the center.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Reversing \"hello\" (indices 0-4)",
+  vars:["left","right","s[left]","s[right]"],
+  steps:[
+   {desc:"Call 1: left=0('h'),right=4('o'). Swap → \"oellh\"",set:{left:"0",right:"4","s[left]":"o","s[right]":"h"},chg:["left","right","s[left]","s[right]"]},
+   {desc:"Call 2: left=1('e'),right=3('l'). Swap → \"olleh\"",set:{left:"1",right:"3"},chg:["left","right"]},
+   {desc:"Call 3: left=2,right=2. left&gt;=right → <span class='exec'>base case, stop</span>. Final: \"olleh\"",set:{left:"2",right:"2"},chg:["left","right"]}
+  ]
+ },
+ output:[
+  {o:"Before: hello"},
+  {o:"After: olleh"},
+  {o:"Max recursion depth for length n string: n/2 calls"}
+ ],
+ better:{
+  naive:"For very long strings (thousands of characters), n/2 levels of recursion could exhaust the call stack — an iterative two-pointer loop avoids that risk entirely.",
+  improvements:[
+   "<b>An iterative version</b> (simple while loop with two pointers) achieves the same result with O(1) stack depth, avoiding recursion limits.",
+   "<b>Tail-call optimization</b> could theoretically eliminate the stack growth here since the recursive call is the last operation, but C compilers don't guarantee this optimization.",
+   "<b>This exercise is valuable for understanding recursion mechanics</b>, even though the iterative version is more practical for production code."
+  ],
+  complexity:["Time: O(n) — n/2 recursive calls, each O(1) work","Space: O(n) call stack in the worst case (recursive), O(1) if converted to iterative"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For a string of length 5 ('hello'), how many recursive calls does reverseInPlace make before hitting the base case?",
+   opts:["5","2 swaps + 1 base case = 3 total calls","10","1"],ans:1,
+   exp:"<b>3 calls total.</b> Two calls perform swaps (positions 0↔4 and 1↔3), and the third call (left=right=2, the middle) hits the base case immediately."},
+  {type:"spot-the-bug",q:"What would happen without the <code>left>=right</code> base case check?",
+   opts:["Nothing, it's optional","Infinite recursion — left and right would keep crossing further with no stopping point","Compile error","Faster execution"],ans:1,
+   exp:"<b>Infinite recursion.</b> Without a base case, left+1 and right-1 would keep being computed indefinitely (or crash on invalid array access), since nothing stops the recursive descent."},
+  {type:"fill-in-the-blank",q:"For a string of length n, the maximum recursion depth is approximately n/____.",
+   answer:"2",exp:"Each call handles one pair from both ends, so roughly half the length determines how many calls are needed."}
+ ]
+},
+{
+ id:"pq79", unit:"Unit 4", tab:"Q79 · Matrix ops library",
+ title:"A function library for matrix operations",
+ question:"Build add, subtract, multiply, transpose functions using pointer arguments. Why does 2D array passing need the column count at compile time?",
+ aim:"Pass fixed-size 2D arrays to functions and understand C's row-major memory layout requirement.",
+ file:"q79.c",
+ syntax:[
+  {tok:"int a[N][N] parameter", why:"2D array decays with a fixed column count",
+   body:"When a 2D array is passed to a function, C needs to know the size of each ROW (the column count) at compile time to correctly compute the address of <code>a[i][j]</code> — it can't be a runtime variable in the simple syntax used here.",
+   trap:"Writing <code>int a[][]</code> without specifying the column dimension is a compile error — C must know how far to 'jump' between rows."},
+  {tok:"why column count specifically", why:"Row-major address arithmetic",
+   body:"The address of <code>a[i][j]</code> is computed as <code>base + i*NUM_COLS + j</code>. Without knowing NUM_COLS, the compiler literally cannot generate correct code to find any element.",
+   trap:"This is why passing genuinely variable-sized 2D arrays to functions requires either a fixed macro/constant, dynamic (pointer-to-pointer) allocation, or C99 VLA function parameters."},
+  {tok:"one function per operation", why:"Clean modular design",
+   body:"Each operation (add, sub, mul, transpose) is its own small function taking the same style of matrix parameters — a small, composable library.",
+   trap:"Repeating the loop boilerplate in each function is fine at small scale, but a larger library might factor out common iteration patterns."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">add</span>(<span class="ty">int</span> a[N][N],<span class="ty">int</span> b[N][N],<span class="ty">int</span> r[N][N]){',note:"N (column count) must be known at compile time.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++)<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;N;j++) r[i][j]=a[i][j]+b[i][j];'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">mul</span>(<span class="ty">int</span> a[N][N],<span class="ty">int</span> b[N][N],<span class="ty">int</span> r[N][N]){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;N;i++)<span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;N;j++){'},
+  {t:'    <span class="ty">int</span> s=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> k=<span class="num">0</span>;k&lt;N;k++) s+=a[i][k]*b[k][j];',note:"Standard matrix multiply inner loop.",hl:true},
+  {t:'    r[i][j]=s;'},
+  {t:'  }'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">transpose</span>(<span class="ty">int</span> a[N][N],<span class="ty">int</span> r[N][N]){ <span class="kw">for</span>(...) r[j][i]=a[i][j]; }',note:"Swap row/column indices when writing to r."}
+ ],
+ mem:{
+  title:"A={{1,2},{3,4}}, B={{5,6},{7,8}}",
+  vars:["operation","result[0][0]","result[0][1]","result[1][0]","result[1][1]"],
+  steps:[
+   {desc:"add(A,B): result[0][0]=1+5=6",set:{operation:"add","result[0][0]":"6"},chg:["operation","result[0][0]"]},
+   {desc:"Full add result: {{6,8},{10,12}}",set:{"result[0][1]":"8","result[1][0]":"10","result[1][1]":"12"},chg:["result[0][1]","result[1][0]","result[1][1]"]},
+   {desc:"mul(A,B): result[0][0] = 1*5+2*7 = 19",set:{operation:"multiply","result[0][0]":"19"},chg:["operation","result[0][0]"]},
+   {desc:"Full multiply result: {{19,22},{43,50}}",set:{"result[0][1]":"22","result[1][0]":"43","result[1][1]":"50"},chg:["result[0][1]","result[1][0]","result[1][1]"]}
+  ]
+ },
+ output:[
+  {o:"Add:"},{o:"6 8"},{o:"10 12"},
+  {o:"Multiply:"},{o:"19 22"},{o:"43 50"},
+  {o:"Transpose A:"},{o:"1 3"},{o:"2 4"}
+ ],
+ better:{
+  naive:"Fixed N (compile-time constant) means the library only works for one specific matrix size — not truly general-purpose.",
+  improvements:[
+   "<b>For runtime-variable sizes</b>, use dynamic allocation (array of pointers, as in Q86) or pass the dimensions explicitly with VLA parameters (C99+).",
+   "<b>Extract common iteration patterns</b> into a shared helper if the library grows to cover more operations.",
+   "<b>Add dimension-mismatch checks</b> — multiplying matrices of incompatible sizes should be an explicit error, not undefined behavior."
+  ],
+  complexity:["Add/subtract/transpose: O(N²)","Multiply: O(N³)","Space: O(N²) per matrix"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why must the column count N be known at compile time for the parameter <code>int a[N][N]</code>?",
+   opts:["Style preference","The compiler needs it to compute correct memory addresses for a[i][j]","No real reason","Only for readability"],ans:1,
+   exp:"<b>Address arithmetic.</b> a[i][j]'s address is base + i×N + j; without knowing N, the compiler can't generate correct code to locate any element beyond the first row."},
+  {type:"spot-the-bug",q:"What is the result of transposing {{1,2},{3,4}}?",
+   opts:["{{1,2},{3,4}} unchanged","{{1,3},{2,4}}","{{4,3},{2,1}}","{{2,1},{4,3}}"],ans:1,
+   exp:"<b>{{1,3},{2,4}}.</b> Transpose flips across the main diagonal, swapping element (0,1)=2 with (1,0)=3."},
+  {type:"fill-in-the-blank",q:"Matrix multiplication of two N×N matrices takes O(N^____) time with the naive algorithm.",
+   answer:"3",exp:"Three nested loops (i,j,k) each running N times gives O(N³)."}
+ ]
+},
+{
+ id:"pq80", unit:"Unit 4", tab:"Q80 · malloc/realloc",
+ title:"Dynamic array with malloc, sort, and realloc",
+ question:"Create an n-int array with malloc, sort it, then realloc to add 10 more elements. Handle allocation failures.",
+ aim:"Chain malloc, a library sort, and realloc together with proper NULL-checking at each step.",
+ file:"q80.c",
+ syntax:[
+  {tok:"malloc(n*sizeof(int))", why:"Runtime-sized heap allocation",
+   body:"Unlike a stack array, malloc's size can be a runtime variable — essential when n isn't known until the program runs.",
+   trap:"Forgetting <code>sizeof(int)</code> (just writing <code>malloc(n)</code>) allocates far too little memory — a classic beginner bug."},
+  {tok:"qsort with a comparator", why:"Generic sorting via function pointer",
+   body:"<code>qsort</code> takes a comparator function that tells it how to order two elements — here, simple ascending integer comparison.",
+   trap:"The comparator must return negative/zero/positive, NOT just -1/0/1 exclusively (though that's a common and valid convention) — and must correctly cast the void pointers back to int*."},
+  {tok:"realloc — may move the block", why:"Growing an existing allocation",
+   body:"<code>realloc</code> may extend the block in place OR allocate a new block and copy the old data, freeing the original. Always use realloc's RETURN VALUE, not the original pointer, for future access.",
+   trap:"Writing <code>arr = realloc(arr, newSize)</code> directly loses the ORIGINAL pointer if realloc fails (returns NULL) — you'd leak the original memory and have no way to free it. Always assign to a temporary first."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> *arr = <span class="fn">malloc</span>(n*<span class="kw">sizeof</span>(<span class="ty">int</span>));',note:"Runtime-sized heap allocation.",hl:true},
+  {t:'<span class="kw">if</span>(!arr){ ...handle failure...; }',note:"Always check malloc's return for NULL."},
+  {t:'<span class="fn">qsort</span>(arr,n,<span class="kw">sizeof</span>(<span class="ty">int</span>),cmp);',note:"Generic sort via comparator function pointer.",hl:true},
+  {t:'<span class="ty">int</span> *bigger = <span class="fn">realloc</span>(arr, (n+<span class="num">10</span>)*<span class="kw">sizeof</span>(<span class="ty">int</span>));',note:"Assign to a TEMPORARY pointer first — never overwrite arr directly.",hl:true},
+  {t:'<span class="kw">if</span>(!bigger){ ...handle failure, arr is STILL VALID...; }',note:"If realloc fails, the original block is untouched — don't lose it."},
+  {t:'arr = bigger;',note:"Only now safe to update arr, since realloc succeeded."}
+ ],
+ mem:{
+  title:"Allocating 5 ints, sorting, then growing by 10",
+  vars:["arr","n","sorted?","new size"],
+  steps:[
+   {desc:"malloc(5*sizeof(int)) → arr points to 5 ints on the heap",set:{arr:"heap block (5 ints)",n:"5"},chg:["arr","n"]},
+   {desc:"Fill with {5,2,8,1,9}, then qsort → {1,2,5,8,9}",set:{"sorted?":"1,2,5,8,9"},chg:["sorted?"]},
+   {desc:"realloc(arr, 15*sizeof(int)) → may move the block, but preserves the first 5 sorted values",set:{"new size":"15 ints"},chg:["new size"]},
+   {desc:"New slots [5..14] filled with fresh data (500,600,...,1400) — <span class='exec'>original sorted data intact</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Sorted: 1 2 5 8 9"},
+  {o:"After realloc (+10): 1 2 5 8 9 500 600 700 800 900 1000 1100 1200 1300 1400"}
+ ],
+ better:{
+  naive:"The code already handles NULL checks correctly — the main risk in naive versions is overwriting the original pointer directly with realloc's result.",
+  improvements:[
+   "<b>Always assign realloc's result to a temporary</b> before updating the real pointer — exactly as shown, this prevents leaking memory on failure.",
+   "<b>Zero-initialize new slots explicitly</b> if you need defined values there — realloc doesn't initialize the newly added memory.",
+   "<b>Consider growth strategy</b>: repeatedly reallocating by a small fixed amount (like +10) can be inefficient for many growths — doubling the capacity is a common amortized-O(1) strategy."
+  ],
+  complexity:["malloc/realloc: O(1) amortized (may involve a copy of O(n) in the worst case)","qsort: O(n log n)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why assign realloc's result to a temporary pointer instead of directly to the original?",
+   opts:["Style only","If realloc fails and returns NULL, overwriting the original loses your only reference to the existing memory","Faster","Required syntax"],ans:1,
+   exp:"<b>Prevents a memory leak.</b> If you write <code>arr = realloc(arr, ...)</code> and it fails, arr becomes NULL — the original block still exists but you've lost the only pointer to it, making it unreachable and unfreeable."},
+  {type:"spot-the-bug",q:"What happens to the original 5 sorted values after realloc grows the array?",
+   opts:["Lost","Preserved — realloc copies existing data on move, or leaves it in place if it doesn't move","Randomized","Sorted again"],ans:1,
+   exp:"<b>Preserved.</b> realloc guarantees the original content (up to the smaller of old/new size) survives, whether it resizes in place or has to move to a new location."},
+  {type:"fill-in-the-blank",q:"Forgetting <code>sizeof(int)</code> in <code>malloc(n)</code> allocates far too ____ memory.",
+   answer:"little",exp:"malloc(n) allocates n BYTES, not n integers — usually 4x too little on typical systems."}
+ ]
+},
+{
+ id:"pq81", unit:"Unit 4", tab:"Q81 · Fast exponentiation",
+ title:"Fast exponentiation by squaring",
+ question:"Implement power(base,exp) in O(log n) recursive calls; convert to iterative and compare stack usage.",
+ aim:"Halve the exponent each recursive call instead of multiplying one at a time.",
+ file:"q81.c",
+ syntax:[
+  {tok:"half = powFast(base, exp/2)", why:"Halving instead of decrementing",
+   body:"Recursing on exp/2 (not exp-1) means the exponent shrinks by HALF each call, giving O(log n) depth instead of O(n).",
+   trap:"A naive recursive power function that does <code>base * powFast(base,exp-1)</code> is O(n) — correct, but misses the entire point of 'fast' exponentiation."},
+  {tok:"result = half*half", why:"Reconstructing from the half-power",
+   body:"Since base^exp = (base^(exp/2))², squaring the half-result reconstructs the full power in one multiplication.",
+   trap:"Forgetting this squaring step and just returning `half` would give base^(exp/2), not base^exp."},
+  {tok:"odd exponent correction", why:"Handle the leftover factor",
+   body:"When exp is odd, exp/2 in integer division truncates, so an extra multiplication by base is needed to correct for the lost fractional half.",
+   trap:"Forgetting this correction gives wrong answers for all odd exponents (half the possible inputs!)."}
+ ],
+ code:[
+  {t:'<span class="ty">long</span> <span class="fn">powFast</span>(<span class="ty">long</span> base,<span class="ty">int</span> exp){'},
+  {t:'  <span class="kw">if</span>(exp==<span class="num">0</span>) <span class="kw">return</span> <span class="num">1</span>;'},
+  {t:'  <span class="ty">long</span> half = <span class="fn">powFast</span>(base, exp/<span class="num">2</span>);',note:"Halve the exponent — O(log n) depth instead of O(n).",hl:true},
+  {t:'  <span class="ty">long</span> result = half*half;',note:"Square the half-power to reconstruct.",hl:true},
+  {t:'  <span class="kw">if</span>(exp%<span class="num">2</span>==<span class="num">1</span>) result *= base;',note:"Odd exponent: correct for the truncated half.",hl:true},
+  {t:'  <span class="kw">return</span> result;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Computing 2^10 via squaring",
+  vars:["exp","half","result"],
+  steps:[
+   {desc:"powFast(2,10): exp/2=5, recurse into powFast(2,5)",set:{exp:"10"},chg:["exp"]},
+   {desc:"powFast(2,5): exp/2=2, recurse into powFast(2,2)... eventually bottoms out at powFast(2,0)=1",set:{exp:"5"},chg:["exp"]},
+   {desc:"Unwinding: powFast(2,1)=1*1*2=2 (odd correction). powFast(2,2)=2*2=4. powFast(2,5)=4*4*2=32 (odd)",set:{half:"4",result:"32"},chg:["half","result"]},
+   {desc:"powFast(2,10) = 32*32 = <span class='exec'>1024</span> (even, no correction needed)",set:{result:"1024"},chg:["result"]}
+  ]
+ },
+ output:[
+  {o:"2^10 recursive = 1024"},
+  {o:"2^10 iterative = 1024"}
+ ],
+ better:{
+  naive:"A naive O(n) recursive power (multiply by base n times) works but is exponentially slower for large exponents than the O(log n) squaring approach.",
+  improvements:[
+   "<b>Squaring</b> (shown here) is the standard optimal approach for exponentiation — O(log n) instead of O(n).",
+   "<b>The iterative version</b> achieves the same complexity with O(1) stack space instead of O(log n) recursion depth — generally preferred in production code.",
+   "<b>For modular exponentiation</b> (common in cryptography), the same squaring technique applies with a modulo operation after each multiply to prevent overflow."
+  ],
+  complexity:["Recursive: O(log n) time, O(log n) stack space","Iterative: O(log n) time, O(1) space"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"How many recursive calls does powFast make to compute base^16 (roughly)?",
+   opts:["16","~4 (log2 16)","8","1"],ans:1,
+   exp:"<b>~4.</b> Each call halves the exponent: 16→8→4→2→1→0, about log2(16)=4 levels of recursion."},
+  {type:"spot-the-bug",q:"What would happen if you forgot the odd-exponent correction (<code>if(exp%2==1) result*=base</code>)?",
+   opts:["No difference","All odd exponents would compute the wrong (too small) result","Only even exponents affected","Compile error"],ans:1,
+   exp:"<b>Wrong results for odd exponents.</b> Integer division truncates exp/2, losing the 'extra' factor of base needed for odd powers — without correction, base^5 would compute as base^4 instead."},
+  {type:"fill-in-the-blank",q:"Fast exponentiation by squaring achieves O(____) time complexity instead of O(n).",
+   answer:"log n",exp:"Halving the exponent each step gives logarithmic depth, drastically faster than linear decrement-by-one recursion."}
+ ]
+},
+{
+ id:"pq82", unit:"Unit 4", tab:"Q82 · Pointer vs value bug",
+ title:"Diagnosing a sort-that-doesn't-stick bug",
+ question:"A function sorts an array via pointer, but the caller's array is unchanged. Is it pass-by-value or pass-by-pointer? Fix it.",
+ aim:"Distinguish between modifying array CONTENTS through a pointer versus reassigning the LOCAL pointer variable itself.",
+ file:"q82.c",
+ syntax:[
+  {tok:"arrays already decay to pointers", why:"The real subtlety here",
+   body:"Contrary to the question's framing, passing an array to a function in C already gives you a pointer to the ORIGINAL data — modifying <code>arr[i]</code> through that pointer DOES affect the caller. The actual bug is more subtle.",
+   trap:"Assuming 'it must be a pass-by-value problem' is the wrong diagnosis — arrays don't get copied when passed to functions in C."},
+  {tok:"local = arr; local = temp (the real bug)", why:"Reassigning the LOCAL pointer copy",
+   body:"The buggy version copies data into a local buffer, sorts THAT, then does <code>local = temp</code> — which only changes what the LOCAL variable points to, not the original array's contents.",
+   trap:"This is genuinely subtle: the bug isn't pass-by-value in the traditional sense, but a pointer reassignment that doesn't propagate back."},
+  {tok:"correct version sorts a[] directly", why:"Modify through the pointer, not the pointer itself",
+   body:"The fix simply sorts the array IN PLACE through the original pointer parameter — every write goes to <code>arr[j]</code>, actually touching the caller's memory.",
+   trap:"The fix looks almost identical to the buggy version at a glance — the difference is subtle and easy to miss in code review."}
+ ],
+ code:[
+  {t:'<span class="cm">// WRONG: sorts a local COPY, then reassigns the LOCAL pointer</span>',hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">bubbleSortWrong</span>(<span class="ty">int</span> *arr, <span class="ty">int</span> n){'},
+  {t:'  <span class="ty">int</span> *local = arr; <span class="ty">int</span> temp[<span class="num">10</span>];'},
+  {t:'  <span class="kw">for</span>(...) temp[i]=local[i]; <span class="cm">// copy into a separate buffer</span>'},
+  {t:'  <span class="cm">// ...sort temp[] here...</span>'},
+  {t:'  local = temp;',note:"BUG: only changes what the LOCAL variable points to — caller's array untouched!",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// RIGHT: sorts through the ORIGINAL pointer directly</span>',hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">bubbleSortRight</span>(<span class="ty">int</span> *arr, <span class="ty">int</span> n){'},
+  {t:'  <span class="kw">for</span>(...) <span class="kw">if</span>(arr[j]&gt;arr[j+<span class="num">1</span>]){ swap arr[j],arr[j+1]; }',note:"Every write touches the CALLER's actual array.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Calling both versions on [5,2,8,1,9]",
+  vars:["caller's array","local pointer inside function"],
+  steps:[
+   {desc:"bubbleSortWrong: copies data to temp[], sorts temp[], then does local=temp",set:{"local pointer inside function":"now points to temp[]"},chg:["local pointer inside function"]},
+   {desc:"Function returns. The LOCAL variable's reassignment vanishes with the stack frame — <span class='exec'>caller's array is untouched</span>",set:{"caller's array":"5,2,8,1,9 (unchanged!)"},chg:["caller's array"]},
+   {desc:"bubbleSortRight: writes directly to arr[j] each swap — these writes go through the pointer to the REAL array",set:{"caller's array":"1,2,5,8,9 (correctly sorted!)"},chg:["caller's array"]}
+  ]
+ },
+ output:[
+  {o:"After WRONG version: 5 2 8 1 9 (unchanged - bug!)"},
+  {o:"After RIGHT version: 1 2 5 8 9 (sorted correctly)"}
+ ],
+ better:{
+  naive:"The 'wrong' version demonstrates a genuinely subtle bug that even experienced C programmers can introduce — reassigning a local pointer copy feels like it should work but doesn't propagate.",
+  improvements:[
+   "<b>Always modify through the pointer's dereferenced value</b> (<code>arr[i]</code> or <code>*arr</code>), never reassign the pointer parameter itself if you want changes to reach the caller.",
+   "<b>If you truly need to return a different pointer</b> (e.g. a newly allocated array), do it via the function's RETURN VALUE or a pointer-to-pointer parameter, not by reassigning a by-value pointer parameter.",
+   "<b>This is a great case study</b> for why 'pass by pointer' still copies the pointer itself (by value) — only what it POINTS TO is shared, not the pointer variable."
+  ],
+  complexity:["Both versions: O(n²) sort time","The bug is semantic, not about complexity"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Is this bug a 'pass-by-value' problem in the traditional sense (array not shared with the function)?",
+   opts:["Yes, arrays are always copied in C","No — arrays already decay to pointers; the bug is reassigning the LOCAL pointer copy","Only for large arrays","Depends on array type"],ans:1,
+   exp:"<b>No, more subtle.</b> The array's pointer IS shared correctly. The bug is that the function sorts a separate local buffer and then reassigns its own local pointer variable — which doesn't affect the caller's actual data."},
+  {type:"spot-the-bug",q:"What is the key difference between the wrong and right versions?",
+   opts:["No real difference","Right version writes directly into arr[] (the original memory); wrong version writes into a local temp buffer","Right version uses more memory","Wrong version is faster"],ans:1,
+   exp:"<b>Where the writes land.</b> The correct version's swaps modify arr[j] directly — the same memory the caller sees. The buggy version's swaps happen in a separate local array that vanishes when the function returns."},
+  {type:"fill-in-the-blank",q:"To make changes visible to the caller, you must write through the ____ pointer, not reassign it.",
+   answer:"same",exp:"Writing to *arr or arr[i] modifies the shared memory; reassigning arr itself only changes the local copy of the pointer."}
+ ]
+},
+{
+ id:"pq83", unit:"Unit 4", tab:"Q83 · Pointer-only search",
+ title:"Second largest using only pointer arithmetic",
+ question:"Find the second largest element using pointers, no <code>[]</code> subscript notation. Show ptr[i] == *(ptr+i).",
+ aim:"Walk the array using pointer increment instead of index variables, tracking two running maxima.",
+ file:"q83.c",
+ syntax:[
+  {tok:"int *p = arr; p++", why:"Pointer walks the array without indices",
+   body:"Incrementing a pointer moves it to the NEXT element (the compiler scales by <code>sizeof(int)</code> automatically) — this replaces <code>arr[i]</code> style indexing entirely.",
+   trap:"Forgetting that pointer arithmetic is automatically scaled by the pointed-to type's size — <code>p+1</code> doesn't mean 'add 1 byte', it means 'next int'."},
+  {tok:"*p dereference", why:"Read the value at the current position",
+   body:"<code>*p</code> gets the int the pointer currently points to — equivalent to <code>arr[i]</code> but expressed purely through pointer mechanics.",
+   trap:"Confusing <code>*p</code> (the value) with <code>p</code> (the address) is the most common pointer arithmetic mistake."},
+  {tok:"ptr[i] === *(ptr+i)", why:"Array subscript IS pointer arithmetic",
+   body:"C's <code>[]</code> syntax is literally defined as syntactic sugar for pointer dereferencing — <code>arr[i]</code> and <code>*(arr+i)</code> compile to identical code.",
+   trap:"Believing arrays and pointers are fundamentally different mechanisms — in expressions, an array name decays to a pointer to its first element."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> *p = arr;',note:"p starts pointing at the first element."},
+  {t:'<span class="ty">int</span> largest = *p, second = -<span class="num">999999</span>;',note:"Dereference to read the first value.",hl:true},
+  {t:'p++;',note:"Advance to the next element — no index variable needed.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;n;i++, p++){',note:"i just counts iterations; p does the actual walking."},
+  {t:'  <span class="kw">if</span>(*p &gt; largest){ second=largest; largest=*p; }',note:"New max found — old max demotes to second."},
+  {t:'  <span class="kw">else if</span>(*p &gt; second &amp;&amp; *p != largest) second=*p;'},
+  {t:'}'},
+  {t:'<span class="cm">// Demonstrating equivalence: arr[2] and *(arr+2) always give the same value</span>',hl:true}
+ ],
+ mem:{
+  title:"Finding second largest in [3,7,2,9,4,9,1]",
+  vars:["p (address)","*p","largest","second"],
+  steps:[
+   {desc:"Start: largest=3 (first element). p advances to index 1.",set:{"*p":"3",largest:"3"},chg:["*p","largest"]},
+   {desc:"*p=7 > largest(3): second=3, largest=7. p advances.",set:{"*p":"7",largest:"7",second:"3"},chg:["*p","largest","second"]},
+   {desc:"*p=2: not > largest, not > second. Skip. *p=9 > largest(7): second=7, largest=9",set:{"*p":"9",largest:"9",second:"7"},chg:["*p","largest","second"]},
+   {desc:"*p=4: no change. *p=9 again: equals largest, explicitly excluded by != check. <span class='exec'>Final second=7</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Array: 3 7 2 9 4 9 1"},
+  {o:"ptr[2] = 2, *(arr+2) = 2 (equivalent)"},
+  {o:"Second largest: 7"}
+ ],
+ better:{
+  naive:"This is already an O(n) single-pass solution — the same complexity as any array-indexed version, just expressed differently.",
+  improvements:[
+   "<b>Pointer-based traversal isn't inherently faster</b> than index-based — both compile to essentially the same machine code with modern compilers.",
+   "<b>The <code>*p != largest</code> guard</b> correctly handles duplicate maximum values (like the two 9s here) — without it, a duplicate max would incorrectly become 'second largest'.",
+   "<b>This exercise's real value</b> is building comfort with pointer arithmetic as an alternative mental model to array indexing — useful for understanding how C really works under the hood."
+  ],
+  complexity:["Time: O(n) — single pass","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For [3,7,2,9,4,9,1] (note: 9 appears twice), what is the second largest DISTINCT value?",
+   opts:["9","7","4","2"],ans:1,
+   exp:"<b>7.</b> Even though 9 appears twice, the <code>*p != largest</code> check prevents the duplicate 9 from being counted as a distinct second-largest value."},
+  {type:"spot-the-bug",q:"What is the relationship between <code>arr[i]</code> and <code>*(arr+i)</code> in C?",
+   opts:["Unrelated operations","They are exactly equivalent — [] is defined as pointer arithmetic syntax sugar","arr[i] is always faster","*(arr+i) only works with pointers, not arrays"],ans:1,
+   exp:"<b>Exactly equivalent.</b> C's array subscript operator is literally defined in terms of pointer arithmetic; both expressions compile to identical machine code."},
+  {type:"fill-in-the-blank",q:"Incrementing an int pointer with <code>p++</code> advances it by ____ byte(s) of the underlying int size, not by 1 raw byte.",
+   answer:"sizeof(int)",exp:"Pointer arithmetic automatically scales by the pointed-to type's size — for int, typically 4 bytes, not 1."}
+ ]
+},
+{
+ id:"pq84", unit:"Unit 4", tab:"Q84 · Tower of Hanoi",
+ title:"Tower of Hanoi: moves, scale, and time",
+ question:"Solve Tower of Hanoi for n disks, printing every move. For n=20, how many moves, and how long at 1ms/move?",
+ aim:"Apply the classic three-part recursive decomposition and compute the exponential move count.",
+ file:"q84.c",
+ syntax:[
+  {tok:"move (n-1) then 1 then (n-1)", why:"The recursive decomposition",
+   body:"To move n disks from A to C: move the top n-1 disks A→B (using C as spare), move the biggest disk A→C directly, then move the n-1 disks B→C (using A as spare).",
+   trap:"Getting the 'spare' peg argument order wrong in either recursive call breaks the whole solution — the roles of from/to/aux rotate specifically."},
+  {tok:"moveCount as a global counter", why:"Track total moves across all recursive calls",
+   body:"A single shared counter incremented once per actual disk move (not per function call) lets you tally the total regardless of recursion depth.",
+   trap:"Incrementing the counter in the wrong place (e.g. once per function CALL instead of once per actual MOVE) would double-count, since each call itself doesn't move a disk — its two recursive sub-calls and one direct move do."},
+  {tok:"verbosePrint flag", why:"Suppress output for huge move counts",
+   body:"For n=20 (over a million moves), printing every single move would flood output uselessly — a flag lets the same function count silently when needed.",
+   trap:"Forgetting to suppress printing for large n turns a demo into an unusable wall of text."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">hanoi</span>(<span class="ty">int</span> n, <span class="ty">char</span> from, <span class="ty">char</span> to, <span class="ty">char</span> aux){'},
+  {t:'  <span class="kw">if</span>(n==<span class="num">0</span>) <span class="kw">return</span>;'},
+  {t:'  <span class="fn">hanoi</span>(n-<span class="num">1</span>, from, aux, to);',note:"Move n-1 disks OUT OF THE WAY, using 'to' as the temporary spare.",hl:true},
+  {t:'  moveCount++;'},
+  {t:'  <span class="kw">if</span>(verbosePrint) <span class="fn">printf</span>(<span class="str">"Move disk %d: %c -&gt; %c\\n"</span>, n, from, to);',note:"The ACTUAL move of the biggest disk."},
+  {t:'  <span class="fn">hanoi</span>(n-<span class="num">1</span>, aux, to, from);',note:"Move the n-1 disks back ONTO the destination, using 'from' as the new spare.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Solving for n=3 disks (A→C, spare B)",
+  vars:["n","from","to","moveCount"],
+  steps:[
+   {desc:"hanoi(3,A,C,B) → recurse hanoi(2,A,B,C) first",set:{n:"2",from:"A",to:"B"},chg:["n","from","to"]},
+   {desc:"hanoi(2,A,B,C) → recurse hanoi(1,A,C,B). Move disk 1: A→C. moveCount=1",set:{n:"1",moveCount:"1"},chg:["n","moveCount"]},
+   {desc:"Move disk 2: A→B. moveCount=2. Then hanoi(1,C,B,A): move disk 1 C→B. moveCount=3",set:{moveCount:"3"},chg:["moveCount"]},
+   {desc:"Back at top: move disk 3: A→C. moveCount=4. Then mirror the first half onto C. <span class='exec'>Final moveCount=7</span> (2³-1)",set:{moveCount:"7"},chg:["moveCount"]}
+  ]
+ },
+ output:[
+  {o:"Total moves for 3 disks: 7"},
+  {o:"Total moves for 20 disks: 1048575"},
+  {o:"At 1ms/move: 1048575.0 ms = 1048.58 seconds"}
+ ],
+ better:{
+  naive:"There's no faster algorithm — Tower of Hanoi is PROVABLY exponential (2^n - 1 moves minimum for n disks), so this recursive solution is already optimal in move count.",
+  improvements:[
+   "<b>The recursion itself IS optimal</b> — 2^n-1 is the mathematically proven minimum number of moves, not just this algorithm's count.",
+   "<b>An iterative version exists</b> (using a clever bit-pattern or stack-based simulation) that avoids recursion's stack depth, useful for very large n where recursion depth itself becomes a concern.",
+   "<b>This is a canonical example</b> of a problem where exponential time is fundamentally unavoidable — a good teaching point about complexity classes."
+  ],
+  complexity:["Time: O(2^n) — exactly 2^n - 1 moves","Space: O(n) recursion depth"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"How many total moves does solving Tower of Hanoi for n disks require?",
+   opts:["n","n²","2^n - 1","n!"],ans:2,
+   exp:"<b>2^n - 1.</b> Each additional disk roughly doubles the required moves, following the recurrence T(n)=2T(n-1)+1."},
+  {type:"spot-the-bug",q:"Why is verbosePrint needed for the n=20 case but not n=3?",
+   opts:["No real reason","n=20 requires over a million moves — printing all of them would be impractically slow and useless","n=20 doesn't actually need any moves","Style preference"],ans:1,
+   exp:"<b>Practicality.</b> 2^20-1 = 1,048,575 moves — printing each one would flood the output uselessly; silently counting is what you actually want for large n."},
+  {type:"fill-in-the-blank",q:"At 1ms per move, solving 20-disk Hanoi takes roughly ____ seconds.",
+   answer:"1048",exp:"1,048,575 moves × 1ms ≈ 1048.6 seconds, or about 17.5 minutes."}
+ ]
+},
+{
+ id:"pq85", unit:"Unit 4", tab:"Q85 · Dispatch table",
+ title:"Function pointer dispatch table",
+ question:"Design <code>evaluate(char op,int a,int b)</code>; build a dispatch table of function pointers for +,-,*,/.",
+ aim:"Store functions themselves in an array, indexed to match operator symbols, avoiding a long if/switch chain.",
+ file:"q85.c",
+ syntax:[
+  {tok:"int (*table[4])(int,int)", why:"An array of function pointers",
+   body:"This declares <code>table</code> as an array of 4 pointers, each pointing to a function taking two ints and returning an int — the exact signature of add/sub/mul/divf.",
+   trap:"The parentheses around <code>*table[4]</code> are essential — without them, <code>int *table[4](int,int)</code> means something completely different (an array of functions returning int*, which isn't even valid)."},
+  {tok:"table[i](a,b)", why:"Calling through a function pointer",
+   body:"Once you have a function pointer, calling it looks identical to calling a normal function — <code>table[i](a,b)</code> invokes whichever function that slot currently points to.",
+   trap:"This indirection is what makes dispatch tables powerful: you can swap which function runs by just changing what the pointer points to, without touching the calling code."},
+  {tok:"switch as an alternative dispatch", why:"Two equivalent designs",
+   body:"The <code>evaluate</code> function using switch-case is functionally equivalent to the table lookup — same behavior, different mechanism. Tables scale better with MANY operations; switch is clearer for a handful.",
+   trap:"Neither is objectively 'better' for 4 operations — the table technique shines when dispatching among dozens of options, like a command interpreter or virtual machine."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">add</span>(<span class="ty">int</span> a,<span class="ty">int</span> b){ <span class="kw">return</span> a+b; }'},
+  {t:'<span class="ty">int</span> <span class="fn">sub</span>(<span class="ty">int</span> a,<span class="ty">int</span> b){ <span class="kw">return</span> a-b; }'},
+  {t:'<span class="ty">int</span> (*table[<span class="num">4</span>])(<span class="ty">int</span>,<span class="ty">int</span>) = {add,sub,mul,divf};',note:"Array of function pointers — parentheses around *table[4] are essential.",hl:true},
+  {t:'<span class="ty">char</span> ops[<span class="num">4</span>]={<span class="str">\'+\'</span>,<span class="str">\'-\'</span>,<span class="str">\'*\'</span>,<span class="str">\'/\'</span>};'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">4</span>;i++) <span class="fn">printf</span>(<span class="str">"%d %c %d = %d\\n"</span>, a, ops[i], b, table[i](a,b));',note:"Call through the pointer — looks just like a normal function call.",hl:true}
+ ],
+ mem:{
+  title:"a=10, b=3, dispatching through the table",
+  vars:["i","ops[i]","table[i](a,b)"],
+  steps:[
+   {desc:"i=0: ops[0]='+'. table[0] points to add(). add(10,3)=13",set:{i:"0","ops[i]":"+","table[i](a,b)":"13"},chg:["i","ops[i]","table[i](a,b)"]},
+   {desc:"i=1: ops[1]='-'. table[1] points to sub(). sub(10,3)=7",set:{i:"1","ops[i]":"-","table[i](a,b)":"7"},chg:["i","ops[i]","table[i](a,b)"]},
+   {desc:"i=2: ops[2]='*'. table[2] points to mul(). mul(10,3)=<span class='exec'>30</span>",set:{i:"2","ops[i]":"*","table[i](a,b)":"30"},chg:["i","ops[i]","table[i](a,b)"]}
+  ]
+ },
+ output:[
+  {o:"10 + 3 = 13"},{o:"10 - 3 = 7"},{o:"10 * 3 = 30"},{o:"10 / 3 = 3"},
+  {o:"Via evaluate(): 10 * 3 = 30"}
+ ],
+ better:{
+  naive:"For just 4 operations, a switch-case is arguably just as clear; the dispatch table's real advantage appears with many more options.",
+  improvements:[
+   "<b>Dispatch tables scale better</b> than long if/switch chains when there are dozens of cases — like implementing a virtual machine's instruction set or a large command interpreter.",
+   "<b>Map operator characters directly to table indices</b> (e.g. using the character's ASCII value with an offset) for O(1) lookup instead of a linear scan through the ops[] array.",
+   "<b>Division by zero</b> is silently handled (returns 0) here — a production version should signal an error explicitly rather than returning a misleadingly 'valid' result."
+  ],
+  complexity:["Time: O(1) per dispatch (table lookup, or O(k) if scanning for the matching operator)","Space: O(k) for k operations"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What does <code>int (*table[4])(int,int)</code> declare?",
+   opts:["A function returning an array of 4 ints","An array of 4 pointers, each to a function taking two ints and returning int","4 separate int pointers","A 2D array"],ans:1,
+   exp:"<b>Array of function pointers.</b> The parentheses group *table[4] together, making it 'array of 4 pointers to functions of signature (int,int)->int'."},
+  {type:"spot-the-bug",q:"What would <code>int *table[4](int,int)</code> (without the extra parens) mean instead?",
+   opts:["The same thing","An array of functions each returning int* — different and mostly invalid here","A single function","A pointer to an array"],ans:1,
+   exp:"<b>Different meaning entirely.</b> Without grouping parens, this parses as an array of functions returning int* — operator precedence in C's declarator syntax makes this distinction critical."},
+  {type:"fill-in-the-blank",q:"Calling through a function pointer, like <code>table[i](a,b)</code>, looks syntactically identical to calling a ____ function.",
+   answer:"normal",exp:"C's syntax makes function-pointer calls indistinguishable in form from ordinary function calls."}
+ ]
+},
+{
+ id:"pq86", unit:"Unit 4", tab:"Q86 · 2D array via pointers",
+ title:"Dynamic 2D array using an array of row pointers",
+ question:"Why does malloc's void* need an explicit cast in C++ but not C? Build a 2D array via array-of-pointers-to-rows; free correctly.",
+ aim:"Allocate an array of pointers, then allocate each row separately, and free in the reverse order.",
+ file:"q86.c",
+ syntax:[
+  {tok:"int **mat = malloc(rows*sizeof(int*))", why:"An array of row pointers",
+   body:"This allocates space for <code>rows</code> POINTERS (not ints) — each element of <code>mat</code> will itself point to a separately-allocated row of ints.",
+   trap:"Confusing <code>sizeof(int*)</code> with <code>sizeof(int)</code> allocates the wrong amount of space for the pointer array itself."},
+  {tok:"per-row malloc in a loop", why:"Each row is its own allocation",
+   body:"Unlike a single 2D malloc, this approach allocates each row SEPARATELY, allowing (in principle) different row lengths — a true jagged array.",
+   trap:"Forgetting to allocate every row (or allocating the wrong size) leaves some rows as uninitialized/wild pointers, crashing on first use."},
+  {tok:"void* cast requirement", why:"C vs C++ difference",
+   body:"C allows implicit conversion from <code>void*</code> to any pointer type, so no cast is needed. C++ requires an explicit cast because it enforces stricter type checking on pointer conversions.",
+   trap:"Adding an explicit cast in C (like <code>(int*)malloc(...)</code>) is harmless and portable to C++, so many style guides recommend it even though C itself doesn't require it."},
+  {tok:"free rows FIRST, then the pointer array", why:"Correct cleanup order",
+   body:"You must free each row's allocation before freeing the array of pointers itself — once you free <code>mat</code>, you've lost the addresses needed to free the individual rows.",
+   trap:"Freeing <code>mat</code> first orphans all the row allocations — a guaranteed memory leak, since you can no longer reach them to free them."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> **mat = <span class="fn">malloc</span>(rows*<span class="kw">sizeof</span>(<span class="ty">int</span>*));',note:"Array of POINTERS, not ints — note sizeof(int*).",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;rows;i++) mat[i]=<span class="fn">malloc</span>(cols*<span class="kw">sizeof</span>(<span class="ty">int</span>));',note:"Each row is its own separate allocation.",hl:true},
+  {t:'<span class="cm">// ...use mat[i][j] normally...</span>'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;rows;i++) <span class="fn">free</span>(mat[i]);',note:"Free EVERY row first — while you still have their addresses.",hl:true},
+  {t:'<span class="fn">free</span>(mat);',note:"THEN free the pointer array itself.",hl:true}
+ ],
+ mem:{
+  title:"Allocating a 3×4 matrix, then freeing",
+  vars:["mat","mat[0]","mat[1]","mat[2]","free order"],
+  steps:[
+   {desc:"mat = malloc(3 * sizeof(int*)) — space for 3 row-pointers",set:{mat:"[ptr,ptr,ptr] (uninitialized)"},chg:["mat"]},
+   {desc:"mat[0]=malloc(4*sizeof(int)), mat[1]=malloc(...), mat[2]=malloc(...) — 3 separate row allocations",set:{"mat[0]":"row 0 block","mat[1]":"row 1 block","mat[2]":"row 2 block"},chg:["mat[0]","mat[1]","mat[2]"]},
+   {desc:"Cleanup: free(mat[0]), free(mat[1]), free(mat[2]) — <span class='exec'>rows freed FIRST</span>",set:{"free order":"rows first"},chg:["free order"]},
+   {desc:"Finally free(mat) — the pointer array itself, now safe since we don't need those addresses anymore",set:{"free order":"then the array"},chg:["free order"]}
+  ]
+ },
+ output:[
+  {o:"2D array via pointer-to-pointer:"},
+  {o:"0 1 2 3"},{o:"4 5 6 7"},{o:"8 9 10 11"},
+  {o:"Freed all memory correctly (rows first, then the pointer array)."}
+ ],
+ better:{
+  naive:"This jagged-array approach (separate row allocations) is flexible but has scattered memory (rows aren't contiguous) — a single big malloc with manual index math is more cache-friendly for uniform-size 2D data.",
+  improvements:[
+   "<b>For uniform rectangular data</b>, consider one big <code>malloc(rows*cols*sizeof(int))</code> block with manual <code>data[i*cols+j]</code> indexing — better cache locality, one allocation instead of many.",
+   "<b>The array-of-pointers approach</b> (shown here) is genuinely useful when rows have DIFFERENT lengths (true jagged arrays), which the single-block approach can't easily support.",
+   "<b>Always free in reverse allocation order</b> — this pattern (rows before the pointer array) generalizes to any nested allocation structure."
+  ],
+  complexity:["Time: O(rows) allocations","Space: O(rows×cols) total, but with rows×extra pointer overhead compared to a single block"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why must you free each row BEFORE freeing the mat pointer array itself?",
+   opts:["Order doesn't matter","Freeing mat first loses the addresses needed to free the individual rows — causing a memory leak","Faster this way","Required by malloc"],ans:1,
+   exp:"<b>Preserves addresses for cleanup.</b> mat[i] holds the only pointers to each row's memory; freeing mat destroys those pointers, making the rows unreachable and permanently leaked."},
+  {type:"spot-the-bug",q:"Why does C not require an explicit cast on malloc's return value, while C++ does?",
+   opts:["C is buggy","C allows implicit void* to any-pointer-type conversion; C++ enforces stricter type checking","No real difference","C++ is older"],ans:1,
+   exp:"<b>Different type systems.</b> C's type rules permit implicit conversion from void* to any object pointer type; C++ requires an explicit cast as part of its stricter type safety."},
+  {type:"fill-in-the-blank",q:"An array of row pointers allocates each row as a ____ (separate/combined) allocation.",
+   answer:"separate",exp:"Each mat[i] is malloc'd independently, allowing (in principle) rows of different lengths."}
+ ]
+},
+{
+ id:"pq87", unit:"Unit 4", tab:"Q87 · Dynamic string return",
+ title:"A function that returns a dynamically allocated string",
+ question:"Write a function that removes vowels and returns a new allocated string; identify the caller/callee memory contract.",
+ aim:"Allocate exactly enough space for the result, and make crystal clear who's responsible for freeing it.",
+ file:"q87.c",
+ syntax:[
+  {tok:"malloc(strlen(s)+1)", why:"Worst-case size, plus null terminator",
+   body:"The result can be AT MOST as long as the input (removing vowels only shrinks it), so allocating <code>strlen(s)+1</code> bytes is always sufficient, even if some space goes unused.",
+   trap:"Forgetting the <code>+1</code> for the null terminator leaves no room to properly end the string, risking a buffer overrun on write."},
+  {tok:"the ownership contract", why:"Who frees this memory?",
+   body:"By convention (and necessity, since C has no garbage collector), whoever RECEIVES a heap-allocated pointer from a function is responsible for eventually calling <code>free()</code> on it.",
+   trap:"This contract is invisible in the type system — nothing stops a caller from forgetting to free, or freeing twice, or a callee from documenting the expectation poorly."},
+  {tok:"consequences of violating the contract", why:"Memory leaks vs double-frees",
+   body:"If the caller never frees the returned string, that's a memory leak. If they free it twice, or if the function itself frees it before returning, that's undefined behavior (often a crash).",
+   trap:"A common real bug: a function's caller assumes the function manages its own memory (like Java/Python would), and never frees the C string it received."}
+ ],
+ code:[
+  {t:'<span class="ty">char</span>* <span class="fn">removeVowels</span>(<span class="ty">const char</span>*s){'},
+  {t:'  <span class="ty">char</span>*result = <span class="fn">malloc</span>(<span class="fn">strlen</span>(s)+<span class="num">1</span>);',note:"Worst case: no vowels removed, so input length + null terminator suffices.",hl:true},
+  {t:'  <span class="ty">int</span> ri=<span class="num">0</span>;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;s[i];i++){'},
+  {t:'    <span class="ty">char</span> c=<span class="fn">tolower</span>(s[i]);'},
+  {t:'    <span class="kw">if</span>(c!=<span class="str">\'a\'</span>&amp;&amp;c!=<span class="str">\'e\'</span>&amp;&amp;c!=<span class="str">\'i\'</span>&amp;&amp;c!=<span class="str">\'o\'</span>&amp;&amp;c!=<span class="str">\'u\'</span>) result[ri++]=s[i];',note:"Copy only non-vowel characters, preserving original case."},
+  {t:'  }'},
+  {t:'  result[ri]=<span class="str">\'\\0\'</span>;',note:"Null-terminate at the ACTUAL final length, not the allocated size."},
+  {t:'  <span class="kw">return</span> result; <span class="cm">// caller MUST free() this</span>',note:"The ownership contract: this pointer is now the caller's responsibility.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// caller: char*out = removeVowels(...); ... ; free(out); ← required!</span>',hl:true}
+ ],
+ mem:{
+  title:"Removing vowels from \"Hello World\"",
+  vars:["input length","allocated size","result content"],
+  steps:[
+   {desc:"strlen(\"Hello World\") = 11. Allocate 12 bytes (11+1 for null terminator)",set:{"input length":"11","allocated size":"12 bytes"},chg:["input length","allocated size"]},
+   {desc:"Copy non-vowel chars: H,l,l, ,W,r,l,d (skipping e,o,o)",set:{"result content":"Hll Wrld"},chg:["result content"]},
+   {desc:"Only 8 of the 12 allocated bytes are actually used (8 chars + null) — <span class='exec'>some allocated space goes unused, which is fine</span>",set:{},chg:[]}
+  ]
+ },
+ output:[{o:"Vowels removed: Hll Wrld"}],
+ better:{
+  naive:"Allocating exactly strlen(s)+1 is already optimal for the worst case — over-allocating further would waste memory for no benefit.",
+  improvements:[
+   "<b>Document the ownership contract explicitly</b> in a comment or documentation, since C's type system provides no enforcement — this is a discipline problem, not a language feature.",
+   "<b>Consider returning via an output parameter</b> (caller provides the buffer) as an alternative design that makes ownership unambiguous — no allocation inside the function at all.",
+   "<b>Use tools like Valgrind</b> or address sanitizers during development to catch leaked or double-freed memory that violates this contract."
+  ],
+  complexity:["Time: O(n) in string length","Space: O(n) for the allocated result"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why allocate <code>strlen(s)+1</code> bytes rather than trying to calculate the exact post-removal length first?",
+   opts:["Wasteful, should calculate exactly","It's the safe worst-case size (no vowels removed) and simpler than a two-pass length calculation","Required by malloc","Faster"],ans:1,
+   exp:"<b>Safe worst-case sizing.</b> Since removing characters can only shrink the string, the original length is always sufficient — no need for a separate pass just to compute the exact final size."},
+  {type:"spot-the-bug",q:"Whose responsibility is it to call free() on the pointer returned by removeVowels?",
+   opts:["The function itself, before returning","The caller, after it's done using the result","Nobody — C garbage collects","The operating system"],ans:1,
+   exp:"<b>The caller's responsibility.</b> By convention, whoever ends up holding a heap pointer from a function must eventually free it — this contract isn't enforced by the compiler, only by discipline."},
+  {type:"fill-in-the-blank",q:"Forgetting to free() a returned dynamically-allocated string causes a memory ____.",
+   answer:"leak",exp:"The allocated memory becomes unreachable but never released, permanently consuming heap space for the life of the program."}
+ ]
+},
+{
+ id:"pq88", unit:"Unit 4", tab:"Q88 · GCD variations",
+ title:"GCD: recursive, iterative, and array-wide",
+ question:"Implement Euclid's GCD recursively; convert to iterative; extend to find the GCD of an entire array.",
+ aim:"Apply the same reduction rule three ways, then fold it across a whole array using repeated pairwise GCD.",
+ file:"q88.c",
+ syntax:[
+  {tok:"gcd(a,b) = gcd(b, a%b)", why:"Euclid's recursive reduction",
+   body:"The GCD of a and b equals the GCD of b and (a mod b) — repeating this shrinks the numbers rapidly until one becomes 0, at which point the other IS the GCD.",
+   trap:"Getting the argument order backwards (<code>gcd(a%b, b)</code> instead of <code>gcd(b, a%b)</code>) breaks the whole algorithm."},
+  {tok:"iterative with a temp swap", why:"Same logic, no recursion",
+   body:"A <code>while(b!=0)</code> loop with a temporary variable achieves identical results without any call stack usage — useful when recursion depth or overhead matters.",
+   trap:"Forgetting the temp variable and trying <code>a=b; b=a%b;</code> directly uses the ALREADY-UPDATED a, computing the wrong remainder."},
+  {tok:"gcdArray folds pairwise", why:"Reduce a whole array to one GCD",
+   body:"GCD of a list is just the GCD of the GCD of the first two, with the third, with the fourth... — a running reduction across the array using the same 2-argument GCD repeatedly.",
+   trap:"Trying to find a 'multi-argument GCD formula' directly is unnecessary — pairwise reduction using the existing 2-arg function is both simpler and correct."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">gcdRecursive</span>(<span class="ty">int</span> a,<span class="ty">int</span> b){ <span class="kw">return</span> b==<span class="num">0</span>? a : <span class="fn">gcdRecursive</span>(b,a%b); }',note:"Euclid's algorithm — reduce until remainder is 0.",hl:true},
+  {t:'<span class="ty">int</span> <span class="fn">gcdIterative</span>(<span class="ty">int</span> a,<span class="ty">int</span> b){'},
+  {t:'  <span class="kw">while</span>(b!=<span class="num">0</span>){ <span class="ty">int</span> t=b; b=a%b; a=t; }',note:"Same reduction, no call stack — t preserves the OLD b before overwriting.",hl:true},
+  {t:'  <span class="kw">return</span> a;'},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">gcdArray</span>(<span class="ty">int</span> arr[],<span class="ty">int</span> n){'},
+  {t:'  <span class="ty">int</span> result=arr[<span class="num">0</span>];'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;n;i++) result=<span class="fn">gcdIterative</span>(result,arr[i]);',note:"Fold pairwise across the whole array.",hl:true},
+  {t:'  <span class="kw">return</span> result;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"gcdRecursive(48,18) — Euclid's reduction",
+  vars:["a","b","a%b"],
+  steps:[
+   {desc:"gcd(48,18): a%b = 48%18 = 12. Recurse into gcd(18,12)",set:{a:"48",b:"18","a%b":"12"},chg:["a","b","a%b"]},
+   {desc:"gcd(18,12): a%b = 18%12 = 6. Recurse into gcd(12,6)",set:{a:"18",b:"12","a%b":"6"},chg:["a","b","a%b"]},
+   {desc:"gcd(12,6): a%b = 12%6 = 0. Recurse into gcd(6,0)",set:{a:"12",b:"6","a%b":"0"},chg:["a","b","a%b"]},
+   {desc:"gcd(6,0): b==0 → <span class='exec'>return a = 6</span>",set:{a:"6",b:"0"},chg:["a","b"]}
+  ]
+ },
+ output:[
+  {o:"GCD(48,18) recursive = 6"},
+  {o:"GCD(48,18) iterative = 6"},
+  {o:"GCD of [48,18,60,24] = 6"}
+ ],
+ better:{
+  naive:"Euclid's algorithm is already essentially optimal — O(log(min(a,b))) time, among the fastest known GCD algorithms for general integers.",
+  improvements:[
+   "<b>The iterative version avoids recursion overhead</b> entirely and is generally preferred in production for exactly this reason — same complexity, less overhead.",
+   "<b>For the array version</b>, an early-exit optimization: if the running GCD ever becomes 1, you can stop immediately (GCD of anything with 1 is always 1).",
+   "<b>The Binary GCD algorithm</b> (using bit shifts instead of modulo) is an alternative that can be faster on some hardware, though asymptotically similar."
+  ],
+  complexity:["Recursive/iterative GCD: O(log(min(a,b)))","Array GCD: O(n log(max value)) — n-1 pairwise GCD calls"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is GCD(48,18) via Euclid's algorithm?",
+   opts:["9","6","12","3"],ans:1,exp:"<b>6.</b> 48%18=12, 18%12=6, 12%6=0 — the last nonzero remainder before hitting 0 is 6."},
+  {type:"spot-the-bug",q:"Why does the iterative version need a temporary variable <code>t</code> instead of just writing <code>a=b; b=a%b;</code>?",
+   opts:["Style only","The second line would use the ALREADY-UPDATED a, computing the wrong remainder","Faster with temp","Required syntax"],ans:1,
+   exp:"<b>Order-of-operations bug avoidance.</b> Without preserving the old b in t first, <code>a=b</code> overwrites a before it's used in the modulo, corrupting the calculation."},
+  {type:"fill-in-the-blank",q:"To find the GCD of an entire array, repeatedly compute the GCD of the running result and the ____ element.",
+   answer:"next",exp:"A pairwise fold: GCD(GCD(GCD(a,b),c),d)... processes the array one element at a time."}
+ ]
+}
+];
+/* ===== PRACTICE QUESTIONS — UNIT 4 (Q89–100) ===== */
+PRACTICE_U4.push(
+{
+ id:"pq89", unit:"Unit 4", tab:"Q89 · Pointer comparison",
+ title:"Comparing two pointers into the same array",
+ question:"p and q point into the same array. Without knowing the array name, determine which has the smaller index using only pointer arithmetic.",
+ aim:"Compare the raw addresses directly — a smaller address means an earlier position in the same array.",
+ file:"q89.c",
+ syntax:[
+  {tok:"p < q comparison", why:"Pointer relational comparison",
+   body:"For pointers into the SAME array, C guarantees that comparing them with <code>&lt;</code> correctly reflects which comes first in memory — earlier elements have smaller addresses.",
+   trap:"This guarantee ONLY holds for pointers into the same array (or one-past-the-end) — comparing pointers into unrelated memory blocks is undefined behavior."},
+  {tok:"p - q gives the index difference", why:"Pointer subtraction",
+   body:"Subtracting two pointers into the same array yields the number of ELEMENTS between them (not bytes) — this directly reveals their index difference.",
+   trap:"Pointer subtraction between pointers into DIFFERENT arrays is undefined behavior, even though it compiles without warning."},
+  {tok:"no array name or base address needed", why:"Pure pointer-level reasoning",
+   body:"You never need to know the array's name, its starting address, or explicit indices — the pointers alone carry enough information for both comparisons.",
+   trap:"Assuming you need to dereference or index to compare positions — the raw pointer VALUES already encode that information."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> arr[]={<span class="num">10</span>,<span class="num">20</span>,<span class="num">30</span>,<span class="num">40</span>,<span class="num">50</span>};'},
+  {t:'<span class="ty">int</span> *p = &amp;arr[<span class="num">3</span>], *q = &amp;arr[<span class="num">1</span>];'},
+  {t:'<span class="kw">if</span>(p&lt;q) <span class="fn">printf</span>(<span class="str">"p points to the earlier element\\n"</span>);',note:"Pointer comparison directly reflects index order within the same array.",hl:true},
+  {t:'<span class="kw">else</span> <span class="fn">printf</span>(<span class="str">"q points to the earlier element\\n"</span>);'},
+  {t:'<span class="fn">printf</span>(<span class="str">"Index difference (p-q): %ld\\n"</span>, (<span class="ty">long</span>)(p-q));',note:"Pointer subtraction gives the ELEMENT count between them.",hl:true}
+ ],
+ mem:{
+  title:"p at index 3, q at index 1",
+  vars:["p (address)","q (address)","p<q?","p-q"],
+  steps:[
+   {desc:"p = &arr[3] (a higher address). q = &arr[1] (a lower address)",set:{"p (address)":"&arr[3]","q (address)":"&arr[1]"},chg:["p (address)","q (address)"]},
+   {desc:"Compare: q's address is smaller → <span class='exec'>q points to the earlier element</span>",set:{"p<q?":"false (q is earlier)"},chg:["p<q?"]},
+   {desc:"p - q = 3 - 1 = <span class='exec'>2</span> (element difference, computed purely from addresses)",set:{"p-q":"2"},chg:["p-q"]}
+  ]
+ },
+ output:[
+  {o:"q points to the earlier element (smaller index)"},
+  {o:"Index difference (p-q): 2"}
+ ],
+ better:{
+  naive:"This is already the correct, standard technique — there's no simpler or more 'optimized' way to compare positions using pure pointer arithmetic.",
+  improvements:[
+   "<b>Remember the same-array restriction</b>: this technique is only well-defined for pointers into the same array (or one-past-the-end) — never for unrelated allocations.",
+   "<b>Pointer subtraction result type is <code>ptrdiff_t</code></b> (a signed integer type) — casting to <code>long</code> for printing (as done here) is a common, portable practice.",
+   "<b>This pattern underlies many STL-style/iterator-based algorithms</b> in C++ — the same logic (comparing and subtracting iterators) generalizes beyond raw C arrays."
+  ],
+  complexity:["Time: O(1)","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For p=&arr[3] and q=&arr[1], what does p-q evaluate to?",
+   opts:["-2","2","4","Undefined"],ans:1,
+   exp:"<b>2.</b> Pointer subtraction gives the element distance: index 3 minus index 1 equals 2."},
+  {type:"spot-the-bug",q:"Is comparing pointers with < always well-defined in C?",
+   opts:["Yes, always","Only for pointers into the same array (or one past its end) — otherwise undefined behavior","Never well-defined","Only for equal pointers"],ans:1,
+   exp:"<b>Only within the same array.</b> The C standard specifically guarantees meaningful ordering comparisons for pointers into a common array; comparing pointers from unrelated allocations is undefined."},
+  {type:"fill-in-the-blank",q:"For pointers into the same array, a ____ address corresponds to an earlier (lower) index.",
+   answer:"smaller",exp:"Lower memory addresses within the same array correspond to earlier elements, given C's guarantee about array layout."}
+ ]
+},
+{
+ id:"pq90", unit:"Unit 4", tab:"Q90 · XOR swap bug",
+ title:"The XOR swap trick and its self-aliasing bug",
+ question:"<code>void swap(int *a,int *b)</code> uses XOR swap. Does it work when a==b? Find the bug and fix it.",
+ aim:"Trace through the XOR swap algorithm when both pointers alias the same memory, and see it silently zero the value.",
+ file:"q90.c",
+ syntax:[
+  {tok:"*a = *a ^ *b (three-step XOR)", why:"Swap without a temporary variable",
+   body:"XOR-based swapping exploits that <code>x^x=0</code> and <code>x^0=x</code> to exchange two values using no extra storage — a classic 'clever trick'.",
+   trap:"This cleverness is exactly what hides the aliasing bug — it's much less obviously broken than a naive temp-variable swap would be in the same situation."},
+  {tok:"when a==b (same address)", why:"The hidden failure case",
+   body:"If both pointers refer to the SAME memory location, the first XOR computes <code>*a ^ *a = 0</code>, zeroing out the value — then the subsequent lines only propagate that zero.",
+   trap:"This isn't a rare edge case — it happens anytime a function is called with the same variable's address twice, which can occur accidentally in more complex code (e.g. through pointer aliasing you didn't realize existed)."},
+  {tok:"if(a==b) return; guard", why:"The straightforward fix",
+   body:"Explicitly checking if the two pointers are identical, and skipping the swap entirely in that case, sidesteps the bug completely — swapping a value with itself is a no-op anyway.",
+   trap:"A tempting 'fix' of using a temp variable instead doesn't actually need the guard (temp-swap is safe for a==b), but the XOR trick specifically requires it."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">swapXorBuggy</span>(<span class="ty">int</span> *a, <span class="ty">int</span> *b){'},
+  {t:'  *a = *a ^ *b;',note:"If a==b: *a ^ *a = 0. Already broken here!",hl:true},
+  {t:'  *b = *a ^ *b;'},
+  {t:'  *a = *a ^ *b;'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">swapSafe</span>(<span class="ty">int</span> *a, <span class="ty">int</span> *b){'},
+  {t:'  <span class="kw">if</span>(a==b) <span class="kw">return</span>; <span class="cm">// guard against aliasing</span>',note:"Skip entirely if both pointers are the same — a no-op swap is safe.",hl:true},
+  {t:'  *a = *a ^ *b; *b = *a ^ *b; *a = *a ^ *b;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Calling swapXorBuggy(&z, &z) — same address twice",
+  vars:["*a","*b","step"],
+  steps:[
+   {desc:"Before: z=42. Both a and b point to the SAME address.",set:{"*a":"42","*b":"42"},chg:["*a","*b"]},
+   {desc:"Step 1: *a = *a^*b = 42^42 = 0. Since a and b are the same address, <span class='exec'>z is now 0!</span>",set:{"*a":"0","*b":"0",step:"z destroyed"},chg:["*a","*b","step"]},
+   {desc:"Steps 2-3: continue XORing already-zeroed values — z stays 0 for the rest of the function",set:{},chg:[]},
+   {desc:"Result: z, which should have stayed 42 (swapping a value with itself), is now permanently <span class='exec'>0</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Normal case: x=8 y=5 (correct)"},
+  {o:"Buggy self-swap: z=0 (should be 42, but XOR trick zeroes it!)"},
+  {o:"Safe self-swap: w=42 (correctly unchanged)"}
+ ],
+ better:{
+  naive:"The XOR trick is a fun bit-manipulation exercise but has a real, subtle correctness bug that a temp-variable swap simply doesn't have.",
+  improvements:[
+   "<b>A plain temp-variable swap</b> (<code>int t=*a; *a=*b; *b=t;</code>) is naturally immune to this aliasing bug — it's also clearer and just as fast on modern hardware, making XOR swap mostly a historical curiosity now.",
+   "<b>If you DO use XOR swap</b>, the <code>a==b</code> guard is not optional — it's required for correctness, not just a defensive nicety.",
+   "<b>This is a great illustration</b> of why 'clever' code needs MORE scrutiny for edge cases, not less — the trick's elegance made the bug harder to spot."
+  ],
+  complexity:["Time: O(1)","Space: O(1) — the XOR trick's supposed advantage, though modern compilers optimize temp-swaps just as well"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After calling swapXorBuggy(&z,&z) where z=42 initially, what is z afterward?",
+   opts:["42 (unchanged)","0 — the XOR trick destroys the value when aliased","-42","Undefined, could be anything"],ans:1,
+   exp:"<b>0.</b> The first line computes *a^*a, which is always 0 regardless of the original value — and since a and b are the same address, this zeroes z immediately."},
+  {type:"spot-the-bug",q:"Why doesn't a temp-variable swap have this same aliasing bug?",
+   opts:["It also has the bug","int t=*a; *a=*b; *b=t; correctly no-ops when a==b, since *b is unchanged when written back","Temp swap is slower","No real difference"],ans:1,
+   exp:"<b>Different mechanics.</b> With a temp variable, even if a==b, the sequence reads the original value into t, then writes *b (same as *a) back to itself unchanged — a harmless no-op, unlike XOR's destructive zeroing."},
+  {type:"fill-in-the-blank",q:"The safe fix for XOR swap is to check <code>if(a==____) return;</code> before proceeding.",
+   answer:"b",exp:"Guarding against the aliasing case (a and b pointing to the same address) sidesteps the bug entirely."}
+ ]
+},
+{
+ id:"pq91", unit:"Unit 4", tab:"Q91 · Modular result system",
+ title:"A modular student result processing system",
+ question:"Separate functions for input, computation, output, and file writing. Use structs passed by pointer. No global variables.",
+ aim:"Compose a clean pipeline of single-purpose functions, each operating on a struct through a pointer.",
+ file:"q91.c",
+ syntax:[
+  {tok:"typedef struct {...} Student", why:"Bundle related data",
+   body:"Grouping name, marks, average, and grade into one struct treats a 'student result' as a single cohesive unit, rather than juggling separate parallel variables.",
+   trap:"Without a struct, you'd need separate arrays for name/marks/avg/grade per student — error-prone to keep in sync."},
+  {tok:"Student *s parameter (pointer, not copy)", why:"Modify the original, avoid copying",
+   body:"Passing a pointer to the struct lets <code>computeResult</code> and <code>inputStudent</code> modify the SAME struct the caller has — no wasteful copying of the whole struct, and changes actually persist.",
+   trap:"Passing the struct BY VALUE (without the pointer) would mean any modifications inside the function are lost when it returns — silently producing an unchanged struct back in main."},
+  {tok:"s->field (arrow) vs s.field (dot)", why:"Access through a pointer vs. a direct struct",
+   body:"Since <code>s</code> is a pointer to a Student, you access its members with <code>-&gt;</code> (arrow), which is shorthand for <code>(*s).field</code>. If you had a direct Student (not a pointer), you'd use the dot operator instead.",
+   trap:"Mixing up dot and arrow notation is a common compile error, though the fix is usually immediately obvious from the error message."},
+  {tok:"no global variables", why:"Explicit data flow",
+   body:"Every function receives exactly the data it needs via parameters (the struct pointer), rather than reading/writing shared global state — making the code's dependencies clear and testable in isolation.",
+   trap:"Using globals instead would make it harder to reason about which function affects what, and complicates testing each piece independently."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">30</span>]; <span class="ty">int</span> marks[<span class="num">5</span>]; <span class="ty">float</span> avg; <span class="ty">char</span> grade; } Student;',note:"One struct bundles all of a student's result data.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">inputStudent</span>(Student *s, <span class="ty">const char</span>*name, <span class="ty">int</span> m[<span class="num">5</span>]){'},
+  {t:'  <span class="fn">strcpy</span>(s->name, name);',note:"Arrow operator — s is a POINTER to the struct.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">5</span>;i++) s->marks[i]=m[i];'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">computeResult</span>(Student *s){'},
+  {t:'  <span class="ty">int</span> sum=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">5</span>;i++) sum+=s->marks[i];'},
+  {t:'  s->avg = sum/<span class="num">5.0</span>;',note:"Modifies the SAME struct main has — because s is a pointer.",hl:true},
+  {t:'  s->grade = s->avg&gt;=<span class="num">90</span>?<span class="str">\'A\'</span>: s->avg&gt;=<span class="num">75</span>?<span class="str">\'B\'</span>: s->avg&gt;=<span class="num">60</span>?<span class="str">\'C\'</span>:<span class="str">\'F\'</span>;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Processing student Asha's marks",
+  vars:["s->name","s->marks","s->avg","s->grade"],
+  steps:[
+   {desc:"inputStudent fills s->name='Asha', s->marks=[85,90,78,92,88]",set:{"s->name":"Asha","s->marks":"85,90,78,92,88"},chg:["s->name","s->marks"]},
+   {desc:"computeResult: sum=433, s->avg=433/5.0=86.60",set:{"s->avg":"86.60"},chg:["s->avg"]},
+   {desc:"86.60 &gt;=75 → <span class='exec'>s->grade = 'B'</span>",set:{"s->grade":"B"},chg:["s->grade"]}
+  ]
+ },
+ output:[{o:"Asha: avg=86.60 grade=B"}],
+ better:{
+  naive:"This modular design is already good practice; a naive version might use separate parallel arrays or global variables instead of one cohesive struct pointer pipeline.",
+  improvements:[
+   "<b>Extend to an array of Student structs</b> for a whole class, processing each with the same functions — the design already scales naturally.",
+   "<b>Add a file-writing function</b> (as the question specifies) that serializes each struct to disk, completing the input→compute→output→file pipeline.",
+   "<b>Validate marks in inputStudent</b> (e.g. reject negative or over-100 values) to keep bad data from ever reaching computeResult."
+  ],
+  complexity:["Time: O(1) per student for input/compute/output","Space: O(1) per struct — fixed-size fields"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why pass <code>Student *s</code> (a pointer) instead of <code>Student s</code> (a direct struct)?",
+   opts:["No difference","Passing by value would copy the whole struct, and changes inside the function wouldn't persist back to the caller","Faster only for small structs","Required syntax"],ans:1,
+   exp:"<b>Persistence of changes.</b> With a pointer, computeResult modifies the SAME struct the caller holds. With pass-by-value, it would modify a throwaway copy, and main's struct would remain unchanged."},
+  {type:"spot-the-bug",q:"What does <code>s->avg</code> mean, given that s is a Student*?",
+   opts:["s times avg","Access the avg field through the pointer s — shorthand for (*s).avg","A syntax error","Multiply avg by s"],ans:1,
+   exp:"<b>Pointer member access.</b> The arrow operator dereferences the pointer and accesses the named field in one step, equivalent to but cleaner than <code>(*s).avg</code>."},
+  {type:"fill-in-the-blank",q:"Avoiding global variables makes each function's data dependencies explicit via its ____.",
+   answer:"parameters",exp:"Passing exactly the needed data as parameters (rather than reading shared globals) makes each function's inputs and effects clear and testable."}
+ ]
+},
+{
+ id:"pq92", unit:"Unit 4", tab:"Q92 · String permutations",
+ title:"Generating all permutations of a string recursively",
+ question:"Generate all permutations of a string using recursion. Trace 'ABC'; identify duplicates if characters repeat.",
+ aim:"Swap each character into the leading position in turn, then recurse on the remaining substring.",
+ file:"q92.c",
+ syntax:[
+  {tok:"swap-recurse-swap-back (backtracking)", why:"Try each choice, then undo it",
+   body:"For each position, swap in a candidate character, recurse to permute the rest, then SWAP BACK to restore the original order before trying the next candidate — classic backtracking.",
+   trap:"Forgetting the 'swap back' step corrupts the string for subsequent iterations of the same loop, producing wrong or incomplete permutations."},
+  {tok:"base case: l==r", why:"A single-character 'substring' is already a full permutation",
+   body:"When the left and right bounds meet, there's nothing left to permute — print the current arrangement of the whole string as one complete permutation.",
+   trap:"Off-by-one in the base case condition (e.g. <code>l&gt;=r</code> vs <code>l==r</code>) could skip or duplicate the final character's contribution."},
+  {tok:"n! total permutations", why:"Factorial growth",
+   body:"A string of length n has n! distinct arrangements (assuming no repeated characters) — 3 characters give 3!=6 permutations, as seen in the output.",
+   trap:"For strings with REPEATED characters (like 'AAB'), this algorithm still generates n! outputs, but some will be IDENTICAL strings — true duplicates, not just similar-looking results."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">permute</span>(<span class="ty">char</span>*s,<span class="ty">int</span> l,<span class="ty">int</span> r){'},
+  {t:'  <span class="kw">if</span>(l==r){ <span class="fn">printf</span>(<span class="str">"%s "</span>, s); <span class="kw">return</span>; }',note:"Base case: nothing left to permute — print this arrangement.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=l;i&lt;=r;i++){'},
+  {t:'    <span class="ty">char</span> t=s[l]; s[l]=s[i]; s[i]=t; <span class="cm">// swap candidate into position l</span>',note:"Try character at position i as the next 'leading' character.",hl:true},
+  {t:'    <span class="fn">permute</span>(s,l+<span class="num">1</span>,r);',note:"Recurse to permute everything AFTER position l."},
+  {t:'    t=s[l]; s[l]=s[i]; s[i]=t; <span class="cm">// swap BACK — backtrack!</span>',note:"Restore original order before trying the next candidate.",hl:true},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Permuting \"ABC\" (l=0, r=2)",
+  vars:["s","l","swap"],
+  steps:[
+   {desc:"i=0: swap s[0],s[0] (no-op). Recurse permute(s,1,2) on \"ABC\"",set:{s:"ABC",swap:"none (i==l)"},chg:["s","swap"]},
+   {desc:"Inside that recursion: generates \"ABC\" and \"ACB\" (permuting just B,C)",set:{s:"ABC, ACB"},chg:["s"]},
+   {desc:"Back at top level: i=1, swap s[0],s[1] → \"BAC\". Recurse → generates \"BAC\",\"BCA\". Then swap BACK to \"ABC\"",set:{s:"BAC (temp)"},chg:["s"]},
+   {desc:"i=2, swap s[0],s[2] → \"CBA\". Recurse → generates \"CBA\",\"CAB\". <span class='exec'>Total: 6 permutations (3!)</span>",set:{s:"CBA (temp)"},chg:["s"]}
+  ]
+ },
+ output:[{o:"Permutations of ABC: ABC ACB BAC BCA CBA CAB"}],
+ better:{
+  naive:"For strings with repeated characters, this algorithm generates n! outputs but some are IDENTICAL — a naive collector would need explicit deduplication if unique permutations are required.",
+  improvements:[
+   "<b>To skip duplicates</b> for strings with repeated characters (like 'AAB'), track which characters have already been tried at each position (e.g. with a small seen-set) and skip repeats.",
+   "<b>For very long strings</b>, n! grows explosively (10 characters = 3.6 million permutations) — this approach is only practical for short strings.",
+   "<b>An iterative alternative</b> (like Heap's algorithm or lexicographic next-permutation) can be more memory-efficient for generating permutations one at a time without recursion."
+  ],
+  complexity:["Time: O(n × n!) — n! permutations, each O(n) to print","Space: O(n) recursion depth"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"How many permutations does a 3-character string with NO repeated letters (like 'ABC') produce?",
+   opts:["3","6 (3!)","9","27"],ans:1,
+   exp:"<b>6.</b> 3! = 3×2×1 = 6 distinct arrangements, exactly as shown in the output."},
+  {type:"spot-the-bug",q:"What would happen if you forgot the 'swap back' step after the recursive call?",
+   opts:["No difference","The string would stay permuted from the previous iteration, corrupting subsequent loop iterations","Faster execution","Compile error"],ans:1,
+   exp:"<b>Corrupted state.</b> Without restoring the original order, each loop iteration would build on the PREVIOUS iteration's swap instead of the original arrangement, producing wrong or missing permutations."},
+  {type:"fill-in-the-blank",q:"For a string with repeated characters like 'AAB', this algorithm still generates 3! = 6 outputs, but some will be exact ____.",
+   answer:"duplicates",exp:"Since two characters are identical, some of the 6 generated arrangements will look exactly the same as text, even though they came from swapping different positions."}
+ ]
+},
+{
+ id:"pq93", unit:"Unit 4", tab:"Q93 · malloc pointer bug",
+ title:"The moved-pointer free() bug",
+ question:"<code>int *p=malloc(sizeof(int)*10); p++; free(p);</code> — is this correct? Identify the error and consequences.",
+ aim:"See why free() requires the EXACT pointer malloc returned, not any pointer derived from it.",
+ file:"q93.c",
+ syntax:[
+  {tok:"p++ after malloc", why:"Moves the pointer away from the block's start",
+   body:"Incrementing p makes it point to the SECOND int in the allocated block — a perfectly valid pointer for READING/WRITING that element, but no longer the address malloc originally returned.",
+   trap:"This is legal pointer arithmetic within the allocated block's bounds — the danger only surfaces when you later call free() on the shifted pointer."},
+  {tok:"free(p) after the shift — undefined behavior", why:"free requires the ORIGINAL malloc'd address",
+   body:"malloc's internal bookkeeping (tracking block size, etc.) is keyed to the EXACT address it returned. Calling free on a shifted pointer corrupts the heap's internal metadata — a serious bug, often crashing later in unrelated code.",
+   trap:"This bug frequently doesn't crash immediately at the free() call itself — the corruption can silently manifest much later, making it notoriously hard to debug."},
+  {tok:"correct fix: use a separate cursor", why:"Keep the original pointer untouched",
+   body:"Introduce a SECOND pointer variable for traversal/indexing, leaving the original malloc'd pointer unchanged and ready for a correct free() call later.",
+   trap:"The temptation to 'reuse' the same pointer variable for both allocation-tracking and traversal is exactly what causes this class of bug."}
+ ],
+ code:[
+  {t:'<span class="cm">// BUGGY (commented out — would be undefined behavior):</span>',hl:true},
+  {t:'<span class="cm">// int *p = malloc(sizeof(int)*10);</span>'},
+  {t:'<span class="cm">// p++;                    // p no longer points to the block\'s start!</span>'},
+  {t:'<span class="cm">// free(p);                // ERROR: undefined behavior — corrupts heap metadata</span>',note:"free() needs the EXACT address malloc returned — not a shifted pointer.",hl:true},
+  {t:'<span class="cm">// CORRECT: keep the original pointer separate from any traversal pointer</span>',hl:true},
+  {t:'<span class="ty">int</span> *p = <span class="fn">malloc</span>(<span class="kw">sizeof</span>(<span class="ty">int</span>)*<span class="num">10</span>);'},
+  {t:'<span class="ty">int</span> *cursor = p;',note:"A SEPARATE pointer variable for traversal.",hl:true},
+  {t:'cursor++;',note:"Safe to shift the COPY — p itself is untouched.",hl:true},
+  {t:'<span class="fn">free</span>(p);',note:"Free the ORIGINAL pointer — exactly what malloc returned. Correct!",hl:true}
+ ],
+ mem:{
+  title:"Why the shifted pointer breaks free()",
+  vars:["malloc returns","p after p++","free() expects"],
+  steps:[
+   {desc:"malloc returns address, say, 0x1000 (block start, with hidden size metadata just before it)",set:{"malloc returns":"0x1000"},chg:["malloc returns"]},
+   {desc:"p++ moves p to 0x1004 (next int, assuming 4-byte ints)",set:{"p after p++":"0x1004"},chg:["p after p++"]},
+   {desc:"free(p) at 0x1004: malloc's allocator looks for metadata JUST BEFORE this address — but that's not where it actually is (it's before 0x1000)",set:{"free() expects":"metadata before 0x1000, not 0x1004"},chg:["free() expects"]},
+   {desc:"Result: <span class='exec'>heap corruption</span> — the allocator reads garbage as if it were size/bookkeeping data",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"cursor now points to element 1 (value uninitialized)"},
+  {o:"Freed correctly using the original pointer."}
+ ],
+ better:{
+  naive:"The buggy pattern (shift-then-free) is a genuine, common source of heap corruption bugs in real C programs, especially when a single pointer variable is reused for both allocation tracking and iteration.",
+  improvements:[
+   "<b>Always keep the original malloc'd pointer untouched</b> until you're ready to free it — use separate variables for any traversal or offset access.",
+   "<b>If you must 'walk' through allocated memory</b>, use array indexing (<code>p[i]</code>) instead of pointer arithmetic that modifies p itself, or explicitly use a second cursor pointer as shown.",
+   "<b>Tools like Valgrind or AddressSanitizer</b> can catch this exact bug pattern during testing, since the corruption often doesn't crash immediately at the point of the mistake."
+  ],
+  complexity:["Time: O(1) for the allocation itself","Space: O(1) extra for a cursor pointer — cheap insurance against a serious bug"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why is <code>free(p)</code> undefined behavior after <code>p++</code> has shifted p away from the block's start?",
+   opts:["No real problem, p still points inside the block","free() needs the EXACT address malloc returned to correctly locate internal bookkeeping metadata","free() re-scans the whole heap so it's fine","Only a problem for arrays, not single ints"],ans:1,
+   exp:"<b>Metadata mismatch.</b> malloc's internal implementation stores size/bookkeeping information relative to the exact address it returned; a shifted pointer points free() to the wrong location for that metadata, corrupting the heap's internal state."},
+  {type:"spot-the-bug",q:"What's the safest fix for code that needs to both track the original allocation AND traverse through it?",
+   opts:["Always free before traversing","Use a separate cursor pointer for traversal, leaving the original pointer unchanged for later free()","Never traverse allocated memory","Free twice to be safe"],ans:1,
+   exp:"<b>Separate pointer variables.</b> Keeping one pointer dedicated to remembering the original allocation address (for free) and a different one for traversal avoids ever calling free() on a shifted address."},
+  {type:"fill-in-the-blank",q:"free() must be called with the exact address that ____ originally returned.",
+   answer:"malloc",exp:"Any deviation from that exact address (via pointer arithmetic) makes the free() call undefined behavior."}
+ ]
+},
+{
+ id:"pq94", unit:"Unit 4", tab:"Q94 · Recursive digital root",
+ title:"Recursive sum of digits and digital root",
+ question:"Write a recursive sum-of-digits function; extend to digital root. Prove both give consistent results by induction.",
+ aim:"Build digitalRoot on top of sumDigits, recursing until a single digit remains, and cross-check against the mod-9 formula.",
+ file:"q94.c",
+ syntax:[
+  {tok:"sumDigits recursive base case", why:"n==0 stops the peeling",
+   body:"Each call peels off the last digit (<code>n%10</code>) and adds it to the recursive result of the REST of the number (<code>n/10</code>) — bottoming out when nothing's left.",
+   trap:"Forgetting the base case (n==0 returns 0) causes infinite recursion, since n/10 eventually reaches 0 but never triggers a stop without it."},
+  {tok:"digitalRoot recurses on sumDigits' result", why:"Repeat until single-digit",
+   body:"If summing digits once doesn't yield a single digit (n&gt;=10), recursively apply <code>digitalRoot</code> to THAT sum — repeating the digit-summing process as many times as needed.",
+   trap:"Calling sumDigits only ONCE isn't enough for larger numbers — 9875 sums to 29, which still needs further reduction to 11, then to 2."},
+  {tok:"consistency with the mod-9 formula", why:"Two independent methods, same answer",
+   body:"The iterative/recursive digit-summing approach and the direct <code>n%9</code> formula (from Q43) should always agree — cross-checking them is a form of proof-by-testing that both are correct.",
+   trap:"Relying on a single method without cross-verification risks not catching a subtle bug in either implementation."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">sumDigits</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n==<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;',note:"Base case — nothing left to sum.",hl:true},
+  {t:'  <span class="kw">return</span> n%<span class="num">10</span> + <span class="fn">sumDigits</span>(n/<span class="num">10</span>);',note:"Peel off the last digit, recurse on the rest.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">digitalRoot</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n&lt;<span class="num">10</span>) <span class="kw">return</span> n;',note:"Already single-digit — done."},
+  {t:'  <span class="kw">return</span> <span class="fn">digitalRoot</span>(<span class="fn">sumDigits</span>(n));',note:"Sum digits once, then recurse AGAIN if the result isn't single-digit yet.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"digitalRoot(9875) via repeated summing",
+  vars:["n","sumDigits(n)"],
+  steps:[
+   {desc:"digitalRoot(9875): 9875>=10, so sumDigits(9875) = 9+8+7+5 = 29",set:{n:"9875","sumDigits(n)":"29"},chg:["n","sumDigits(n)"]},
+   {desc:"digitalRoot(29): 29>=10, so sumDigits(29) = 2+9 = 11",set:{n:"29","sumDigits(n)":"11"},chg:["n","sumDigits(n)"]},
+   {desc:"digitalRoot(11): 11>=10, so sumDigits(11) = 1+1 = 2",set:{n:"11","sumDigits(n)":"2"},chg:["n","sumDigits(n)"]},
+   {desc:"digitalRoot(2): 2&lt;10 → <span class='exec'>return 2</span> — matches the mod-9 formula from Q43!",set:{n:"2"},chg:["n"]}
+  ]
+ },
+ output:[
+  {o:"sumDigits(9875) = 29"},
+  {o:"digitalRoot(9875) = 2"},
+  {o:"Formula check: 2 (matches digitalRoot)"}
+ ],
+ better:{
+  naive:"The recursive digit-summing approach works but does real computation each reduction step; the closed-form mod-9 formula (from Q43) computes the same answer in O(1).",
+  improvements:[
+   "<b>Prefer the O(1) formula</b> (<code>n%9</code>, with a zero-special-case) in production code — no need to actually sum digits at all once you know the mathematical shortcut.",
+   "<b>Keep the recursive version for teaching</b> — it makes the underlying process concrete and directly demonstrates WHY the formula works.",
+   "<b>The consistency check</b> (comparing both methods' results) is a valuable habit: when two independently-derived approaches agree, your confidence in both increases significantly."
+  ],
+  complexity:["sumDigits: O(log n) — one call per digit","digitalRoot: O(log n) total across all reduction rounds combined","Formula: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is sumDigits(9875)?",
+   opts:["9875","29","2","11"],ans:1,exp:"<b>29.</b> 9+8+7+5 = 29 — a single application of digit-summing, before any further digital-root reduction."},
+  {type:"spot-the-bug",q:"Why does digitalRoot need to potentially call sumDigits MULTIPLE times (via recursion), not just once?",
+   opts:["It doesn't, once is always enough","Summing digits once might still yield a multi-digit result (like 29), requiring further reduction","Style only","Bug in the design"],ans:1,
+   exp:"<b>Multiple reduction rounds needed.</b> For a number like 9875, one round of digit-summing gives 29 — still not single-digit — requiring digitalRoot to recurse and sum again."},
+  {type:"fill-in-the-blank",q:"digitalRoot(9875) and the formula <code>9875 % ____</code> (with a zero-adjustment) should always agree.",
+   answer:"9",exp:"The digital root equals n mod 9, matching the iterative digit-summing result — a nice cross-check between two independent methods."}
+ ]
+},
+{
+ id:"pq95", unit:"Unit 4", tab:"Q95 · Extract primes dynamically",
+ title:"Extract primes into a new dynamically allocated array",
+ question:"A function receives an array and size, returns a NEW allocated array of just the primes, with count returned via a pointer parameter.",
+ aim:"Use a pointer parameter as a second 'return value' for the count, alongside the function's actual return (the new array).",
+ file:"q95.c",
+ syntax:[
+  {tok:"int *count parameter", why:"Returning a second value via pointer",
+   body:"C functions can only directly return ONE value, but by accepting a pointer to an int, the function can also 'return' the count by writing through that pointer — a common C idiom.",
+   trap:"Forgetting to actually write to <code>*count</code> inside the function means the caller's count variable stays uninitialized/unchanged."},
+  {tok:"malloc(n*sizeof(int)) — worst case sizing", why:"Safe upper bound",
+   body:"The result can have AT MOST n primes (if every element happened to be prime), so allocating space for n ints is always sufficient, even though fewer might actually be used.",
+   trap:"Under-allocating (e.g. guessing a smaller size) risks writing past the buffer if more primes are found than expected."},
+  {tok:"(*count)++ increment through pointer", why:"Modify the caller's variable via dereference",
+   body:"<code>(*count)++</code> increments the actual int the caller's variable refers to — the parentheses are necessary since <code>*count++</code> would parse differently (incrementing the POINTER, not the pointed-to value).",
+   trap:"Writing <code>*count++</code> instead of <code>(*count)++</code> is a classic precedence bug — it increments the pointer address, not the count value, due to ++ binding tighter than *."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span>* <span class="fn">extractPrimes</span>(<span class="ty">int</span> arr[], <span class="ty">int</span> n, <span class="ty">int</span> *count){'},
+  {t:'  <span class="ty">int</span> *result = <span class="fn">malloc</span>(n*<span class="kw">sizeof</span>(<span class="ty">int</span>));',note:"Worst case: every element is prime.",hl:true},
+  {t:'  *count=<span class="num">0</span>;',note:"Initialize the caller's count to zero via the pointer."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++) <span class="kw">if</span>(<span class="fn">isPrime</span>(arr[i])) result[(*count)++]=arr[i];',note:"Store the prime AND increment count in one expression — parentheses matter!",hl:true},
+  {t:'  <span class="kw">return</span> result;',note:"Return the new array; count was already communicated via the pointer parameter."},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Extracting primes from [4,7,10,13,15,17,20,23]",
+  vars:["arr[i]","isPrime?","result[]","*count"],
+  steps:[
+   {desc:"4: not prime. 7: prime! result[0]=7, count becomes 1",set:{"arr[i]":"7","isPrime?":"yes","result[]":"7","*count":"1"},chg:["arr[i]","isPrime?","result[]","*count"]},
+   {desc:"10: not prime. 13: prime! result[1]=13, count becomes 2",set:{"arr[i]":"13","result[]":"7,13","*count":"2"},chg:["arr[i]","result[]","*count"]},
+   {desc:"15: not prime. 17: prime! result[2]=17, count=3. 20: not prime. 23: prime! result[3]=23, count=4",set:{"result[]":"7,13,17,23","*count":"4"},chg:["result[]","*count"]}
+  ]
+ },
+ output:[{o:"Primes found (4): 7 13 17 23"}],
+ better:{
+  naive:"Allocating n ints even when only a few primes are found wastes some memory — acceptable for the safety guarantee, but worth knowing the tradeoff.",
+  improvements:[
+   "<b>Shrink the allocation afterward</b> with <code>realloc(result, (*count)*sizeof(int))</code> to release the unused portion, if memory efficiency matters.",
+   "<b>Document the ownership contract</b> clearly: the caller must eventually free() the returned array, exactly like Q87's vowel-removal function.",
+   "<b>Consider returning a struct</b> {int* data; int count;} instead of using an out-parameter, as an alternative API style some find cleaner — both are common in real C code."
+  ],
+  complexity:["Time: O(n√max) — isPrime check per element","Space: O(n) worst case for the result array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why does the function take a pointer to count instead of just returning the count directly?",
+   opts:["Style only","C functions return only one value directly; the function already uses its return value for the new array, so count needs another channel","Faster","Required by malloc"],ans:1,
+   exp:"<b>Single return value limit.</b> Since the function's actual return is the new prime array, the count needs to be communicated some other way — writing through a pointer parameter is the standard C idiom for this."},
+  {type:"spot-the-bug",q:"Why must you write <code>(*count)++</code> with parentheses, rather than <code>*count++</code>?",
+   opts:["No difference","*count++ increments the POINTER address due to operator precedence, not the value it points to","Parentheses are optional style","Faster with parens"],ans:1,
+   exp:"<b>Operator precedence trap.</b> ++ binds tighter than *, so *count++ parses as *(count++) — incrementing the pointer itself, then dereferencing the OLD address. The parentheses force dereferencing first, then incrementing the VALUE."},
+  {type:"fill-in-the-blank",q:"The result array is allocated with size n (not the exact prime count) because n is the safe ____ ____ bound.",
+   answer:"worst case",exp:"Since every element could theoretically be prime, allocating for n elements guarantees enough space regardless of the actual count."}
+ ]
+},
+{
+ id:"pq96", unit:"Unit 4", tab:"Q96 · Declaration ambiguity",
+ title:"int *p,*q vs int* p,q — the declaration trap",
+ question:"What does each declaration actually declare? Write code demonstrating the difference and propose a style rule.",
+ aim:"See that the asterisk in C's declaration syntax binds to the VARIABLE NAME, not the type keyword.",
+ file:"q96.c",
+ syntax:[
+  {tok:"int *p, *q;", why:"Both are pointers — the * is repeated",
+   body:"Writing <code>*</code> before EACH variable name correctly declares both p and q as pointers to int.",
+   trap:"This is the safe, unambiguous way to declare multiple pointers on one line — but it requires remembering to repeat the asterisk every time."},
+  {tok:"int* r, s;", why:"Only r is a pointer — the classic trap",
+   body:"Despite the <code>int*</code> visually looking like 'the type is int-pointer', C's grammar actually attaches the <code>*</code> to the FIRST declarator only. So <code>r</code> is <code>int*</code>, but <code>s</code> is just a plain <code>int</code>.",
+   trap:"This single-line declaration style, while superficially cleaner, silently creates a type mismatch that the compiler won't warn about (s is legally just an int, so there's no error — only a likely logic bug when s is later misused as if it were a pointer)."},
+  {tok:"the underlying grammar rule", why:"* is part of the declarator, not the base type",
+   body:"C's declaration syntax treats <code>int</code> as the base type, and each comma-separated item (<code>*p</code>, <code>q</code>, etc.) as a separate 'declarator' that may or may not include a leading <code>*</code>.",
+   trap:"This is a genuine, well-known wart in C's syntax design — many style guides exist specifically to work around this confusion."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> *p, *q; <span class="cm">// BOTH are pointers — * repeated for each name</span>',note:"Safe, explicit style.",hl:true},
+  {t:'<span class="ty">int</span>* r, s; <span class="cm">// ONLY r is a pointer; s is a PLAIN int!</span>',note:"The * attaches to r only — s has no pointer qualifier at all.",hl:true},
+  {t:'<span class="ty">int</span> a=<span class="num">10</span>,b=<span class="num">20</span>;'},
+  {t:'p=&amp;a; q=&amp;b;'},
+  {t:'<span class="fn">printf</span>(<span class="str">"*p=%d *q=%d\\n"</span>, *p, *q);',note:"Both dereference correctly — both are genuine pointers."},
+  {t:'r=&amp;a; s=<span class="num">99</span>; <span class="cm">// s is just an int, assigned 99 directly</span>',note:"s behaves as a plain int despite appearing on the 'int*' line.",hl:true}
+ ],
+ mem:{
+  title:"Two declaration styles, compared",
+  vars:["p type","q type","r type","s type"],
+  steps:[
+   {desc:"int *p, *q: both p and q are declared as int* (pointer to int)",set:{"p type":"int*","q type":"int*"},chg:["p type","q type"]},
+   {desc:"int* r, s: r is int* (pointer), but s is JUST int — no pointer qualifier",set:{"r type":"int*","s type":"int (NOT a pointer!)"},chg:["r type","s type"]},
+   {desc:"Using s=99 directly (not *s=99) confirms: <span class='exec'>s really is a plain int, not a pointer</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"*p=10 *q=20"},
+  {o:"*r=10 s=99 (s is NOT a pointer despite appearing on the same line as int*)"}
+ ],
+ better:{
+  naive:"The int* r, s; style, while visually appealing to some, is a genuine readability hazard that has caused real bugs in production code.",
+  improvements:[
+   "<b>Declare one variable per line</b> (<code>int *p; int *q;</code>) — eliminates the ambiguity entirely and is the style many style guides recommend.",
+   "<b>If declaring multiple pointers on one line</b>, always repeat the asterisk for each name (<code>int *p, *q;</code>) to avoid the trap.",
+   "<b>Never mix pointer and non-pointer declarations</b> on the same line (like <code>int* r, s;</code>) — if you need both a pointer and a plain int, declare them separately for clarity."
+  ],
+  complexity:["This is a syntax/readability issue, not a performance one","Time/Space: N/A"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"In <code>int* r, s;</code>, what is the type of s?",
+   opts:["int* (pointer to int)","Plain int — NOT a pointer","Undefined","Same as r always"],ans:1,
+   exp:"<b>Plain int.</b> The * only attaches to the first declarator (r); s is declared as an ordinary int, despite the visual grouping suggesting otherwise."},
+  {type:"spot-the-bug",q:"What's the safest style to avoid this declaration ambiguity?",
+   opts:["Always use int* style","Repeat the * for every pointer variable, or declare one variable per line","Never use pointers","Use typedef always"],ans:1,
+   exp:"<b>Repeat the asterisk, or one per line.</b> Writing <code>int *p, *q;</code> (repeating *) or declaring each variable on its own line eliminates the ambiguity entirely."},
+  {type:"fill-in-the-blank",q:"In C's declaration grammar, the * attaches to the ____, not the base type keyword.",
+   answer:"declarator",exp:"Each comma-separated name (with its own optional *) is a separate declarator — the * is part of that specific declarator, not a property of the shared base type."}
+ ]
+},
+{
+ id:"pq97", unit:"Unit 4", tab:"Q97 · Recursive dec-to-bin",
+ title:"Recursive decimal-to-binary conversion, and back",
+ question:"Convert decimal to binary recursively, storing bits in an array. Trace decimal 13. Then reverse: binary array to decimal, also recursive.",
+ aim:"Recurse on the quotient first (to get most-significant bits in order), then place each remainder as you unwind.",
+ file:"q97.c",
+ syntax:[
+  {tok:"recurse BEFORE placing the current bit", why:"Get most-significant bits first",
+   body:"By recursing on <code>n/2</code> BEFORE storing the current bit (<code>n%2</code>), the most significant bits get placed into the array first as the recursion unwinds — producing correct left-to-right binary order.",
+   trap:"Placing the bit BEFORE recursing would reverse the bit order, since the least-significant bit would end up first in the array."},
+  {tok:"idx tracks the array position across calls", why:"Threading state through recursion",
+   body:"The function returns the UPDATED index after placing a bit, so each recursive call knows exactly where the next bit should go — a form of passing mutable state via return values.",
+   trap:"Not properly threading the index (e.g. always starting from 0) would cause each recursive level to overwrite the SAME array position instead of advancing."},
+  {tok:"binToDec: reverse via positional weights", why:"Rebuild the decimal value from bits",
+   body:"Each bit's contribution is <code>bit * 2^position</code> — the recursive version processes bits from the LAST one backward, doubling the accumulated result and adding each bit as it goes.",
+   trap:"Getting the recursion direction backward (processing from bits[0] instead of bits[n-1]) would compute the wrong positional weights."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">decToBin</span>(<span class="ty">int</span> n, <span class="ty">int</span> bits[], <span class="ty">int</span> idx){'},
+  {t:'  <span class="kw">if</span>(n==<span class="num">0</span>) <span class="kw">return</span> idx;',note:"Base case: nothing more to convert."},
+  {t:'  idx = <span class="fn">decToBin</span>(n/<span class="num">2</span>, bits, idx);',note:"Recurse FIRST — places higher-order bits earlier in the array.",hl:true},
+  {t:'  bits[idx]=n%<span class="num">2</span>;',note:"Only AFTER the recursive call, place the current bit."},
+  {t:'  <span class="kw">return</span> idx+<span class="num">1</span>;',note:"Report the next available array slot to the caller."},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">binToDec</span>(<span class="ty">int</span> bits[], <span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n==<span class="num">0</span>) <span class="kw">return</span> <span class="num">0</span>;'},
+  {t:'  <span class="kw">return</span> bits[n-<span class="num">1</span>] + <span class="num">2</span>*<span class="fn">binToDec</span>(bits,n-<span class="num">1</span>);',note:"Process from the LAST bit backward, doubling as you unwind.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Converting 13 to binary recursively",
+  vars:["n","idx","bits[]"],
+  steps:[
+   {desc:"decToBin(13,bits,0): recurse first into decToBin(6,bits,0)",set:{n:"13"},chg:["n"]},
+   {desc:"decToBin(6,...): recurse into decToBin(3,...). decToBin(3,...): recurse into decToBin(1,...). decToBin(1,...): recurse into decToBin(0,...) → returns idx=0 immediately (base case)",set:{n:"0",idx:"0"},chg:["n","idx"]},
+   {desc:"Unwinding: decToBin(1,...) places bits[0]=1%2=1, returns idx=1. decToBin(3,...) places bits[1]=3%2=1, returns idx=2",set:{"bits[]":"1,1"},chg:["bits[]"]},
+   {desc:"decToBin(6,...) places bits[2]=6%2=0, returns idx=3. decToBin(13,...) places bits[3]=13%2=1. <span class='exec'>Final bits: 1,1,0,1 = binary 1101</span>",set:{"bits[]":"1,1,0,1"},chg:["bits[]"]}
+  ]
+ },
+ output:[
+  {o:"13 in binary: 1101"},
+  {o:"Back to decimal: 13"}
+ ],
+ better:{
+  naive:"This recursive approach works well for teaching but has recursion overhead compared to a simple iterative loop for such a straightforward conversion.",
+  improvements:[
+   "<b>An iterative version</b> (repeatedly divide by 2, prepend the remainder) achieves the same result with O(1) extra stack space, more practical for production use.",
+   "<b>For binary-to-decimal conversion</b>, an iterative left-to-right scan (<code>result = result*2 + bit</code>) is simpler than the recursive version and avoids the recursion entirely.",
+   "<b>This exercise's value</b> is in understanding how recursion order (before vs. after the recursive call) directly controls output ORDER — a subtle but important recursion concept."
+  ],
+  complexity:["Time: O(log n) for decToBin (one call per bit)","Time: O(n) for binToDec (n = number of bits)","Space: O(log n) or O(n) recursion depth respectively"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is 13 in binary?",
+   opts:["1100","1101","1110","1011"],ans:1,
+   exp:"<b>1101.</b> 13 = 8+4+0+1 = 1×8 + 1×4 + 0×2 + 1×1, giving binary 1101."},
+  {type:"spot-the-bug",q:"Why must decToBin recurse BEFORE placing the current bit, not after?",
+   opts:["No difference","Recursing first ensures higher-order (more significant) bits get placed into the array earlier, giving correct left-to-right order","Faster","Required syntax"],ans:1,
+   exp:"<b>Correct bit ordering.</b> If you placed the bit first and recursed after, the LEAST significant bit would end up first in the array — backward from the conventional left-to-right binary representation."},
+  {type:"fill-in-the-blank",q:"binToDec processes bits from the ____ index backward, doubling the accumulated value at each step.",
+   answer:"last",exp:"Starting from bits[n-1] and working backward with doubling correctly reconstructs the positional (place-value) weights of each bit."}
+ ]
+},
+{
+ id:"pq98", unit:"Unit 4", tab:"Q98 · Generic void* swap",
+ title:"A truly generic swap using void pointers",
+ question:"Implement <code>void swap(void *a, void *b, size_t size)</code> that swaps ints, floats, or structs. Why is memcpy needed and sizeof critical?",
+ aim:"Use raw byte-level copying (memcpy) instead of type-specific arithmetic, since void* carries no type information.",
+ file:"q98.c",
+ syntax:[
+  {tok:"void* parameters — no type information", why:"Generic across any data type",
+   body:"<code>void*</code> can point to ANY type, but the compiler doesn't know what's actually there — you can't dereference a void* directly or do type-specific arithmetic on it.",
+   trap:"Attempting <code>*a = *b</code> on void pointers is a compile error — the compiler doesn't know how many bytes to copy without more information."},
+  {tok:"memcpy for byte-level copying", why:"Works regardless of the actual type",
+   body:"<code>memcpy</code> operates purely on raw bytes, making no assumptions about the data's type — perfect for a function that must work with ints, floats, structs, or anything else.",
+   trap:"Using memcpy incorrectly (wrong size, overlapping regions where memmove is needed instead) can cause subtle bugs, though this specific swap usage is safe since source/destination don't overlap during any single copy."},
+  {tok:"size parameter — the critical missing piece", why:"How many bytes to actually move",
+   body:"Since void* carries no size information, the CALLER must explicitly tell the function how many bytes each element occupies via <code>sizeof(type)</code> — this is what makes the generic swap actually work correctly for different types.",
+   trap:"Passing the wrong size (e.g. sizeof(int) when swapping structs) would only swap PART of the data, corrupting both values."},
+  {tok:"char temp[64] as scratch space", why:"A fixed-size buffer for the temporary value",
+   body:"The temporary storage needs to be large enough for whatever's being swapped — this demo assumes size≤64 bytes, which covers ints, floats, and reasonably-sized structs.",
+   trap:"For truly arbitrary sizes, a fixed-size stack buffer isn't safe — a production version would need dynamic allocation or a size check with a fallback."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">genericSwap</span>(<span class="ty">void</span> *a, <span class="ty">void</span> *b, <span class="ty">size_t</span> size){'},
+  {t:'  <span class="ty">char</span> temp[<span class="num">64</span>]; <span class="cm">// scratch space, assumes size &lt;= 64</span>',note:"Fixed-size buffer — a real limitation of this simple demo."},
+  {t:'  <span class="fn">memcpy</span>(temp, a, size);',note:"Copy a's bytes into temp — works regardless of the actual type.",hl:true},
+  {t:'  <span class="fn">memcpy</span>(a, b, size);',note:"Copy b's bytes into a's location.",hl:true},
+  {t:'  <span class="fn">memcpy</span>(b, temp, size);',note:"Copy the saved original a into b's location.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Usage: genericSwap(&x, &y, sizeof(int));  — caller specifies the size explicitly</span>',hl:true}
+ ],
+ mem:{
+  title:"Swapping two structs via genericSwap",
+  vars:["temp buffer","p1","p2"],
+  steps:[
+   {desc:"p1={1,2}, p2={3,4}. memcpy(temp, &p1, sizeof(Point)) — save p1's bytes",set:{"temp buffer":"{1,2} bytes",p1:"{1,2}",p2:"{3,4}"},chg:["temp buffer","p1","p2"]},
+   {desc:"memcpy(&p1, &p2, sizeof(Point)) — p1 now holds p2's original bytes",set:{p1:"{3,4}"},chg:["p1"]},
+   {desc:"memcpy(&p2, temp, sizeof(Point)) — p2 now holds the ORIGINAL p1's bytes from temp. <span class='exec'>Swap complete!</span>",set:{p2:"{1,2}"},chg:["p2"]}
+  ]
+ },
+ output:[
+  {o:"ints: x=10 y=5"},
+  {o:"floats: f1=2.5 f2=1.5"},
+  {o:"structs: p1=(3,4) p2=(1,2)"}
+ ],
+ better:{
+  naive:"The fixed 64-byte scratch buffer limits this to reasonably small types — swapping large structs or arrays beyond that size would overflow the buffer.",
+  improvements:[
+   "<b>For arbitrary sizes</b>, dynamically allocate the temp buffer (<code>malloc(size)</code>) instead of a fixed stack array — trades a small performance cost for true generality.",
+   "<b>Validate the size parameter</b> isn't zero or unreasonably large before proceeding, to catch caller mistakes early.",
+   "<b>This generic pattern</b> (void* + explicit size) is exactly how C's standard library functions like qsort implement type-generic behavior without C++-style templates or generics."
+  ],
+  complexity:["Time: O(size) — proportional to the byte size of the swapped type","Space: O(size) for the temporary buffer"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why can't genericSwap simply do <code>*a = *b</code> to swap the values?",
+   opts:["It could, that's simpler","void* can't be dereferenced directly — the compiler doesn't know the type or size of data involved","Faster with *","Required syntax uses *"],ans:1,
+   exp:"<b>No type information.</b> void* is a pointer to 'something unspecified' — the compiler has no idea how many bytes to read/write, so direct dereferencing isn't even legal C syntax for void*."},
+  {type:"spot-the-bug",q:"Why is the size parameter absolutely necessary for this function to work correctly?",
+   opts:["It's optional, just for documentation","Since void* carries no size info, the function needs to be explicitly told how many bytes to copy for each specific call","Only needed for structs","Only needed for arrays"],ans:1,
+   exp:"<b>Essential, not optional.</b> Without size, memcpy wouldn't know whether it's copying 4 bytes (an int/float) or the larger size of a struct — the caller must supply this via sizeof(type) for correctness."},
+  {type:"fill-in-the-blank",q:"The function uses ____ to copy raw bytes, since it works regardless of the actual data type involved.",
+   answer:"memcpy",exp:"memcpy operates purely at the byte level, making it perfectly suited for a type-generic swap function."}
+ ]
+},
+{
+ id:"pq99", unit:"Unit 4", tab:"Q99 · Factorial overflow",
+ title:"Factorial overflow and the double-precision fix",
+ question:"Recursive n! overflows int for n>12. Redesign with double. Find where double loses precision. Propose a bignum approach.",
+ aim:"See int overflow silently produce garbage, then find where even double's much larger range eventually loses exactness.",
+ file:"q99.c",
+ syntax:[
+  {tok:"int factorial overflows silently", why:"No error, just wrong answers",
+   body:"13! = 6,227,020,800, which exceeds INT_MAX (~2.1 billion) — the computation doesn't crash, it just wraps around to a nonsensical value with no warning.",
+   trap:"Unlike some languages, C gives no automatic overflow detection for signed integers — the bug can go unnoticed unless you specifically check for it or compare against a known-correct value."},
+  {tok:"double factorial — much larger range", why:"64-bit float extends usable range dramatically",
+   body:"double can represent integers exactly up to about 2^53 (~9 quadrillion), letting factorial computations proceed correctly much further than int allows — up to about 18! before precision issues begin.",
+   trap:"double is NOT infinite precision — it just has a much larger 'exact integer' range than int, not an unlimited one."},
+  {tok:"precision loss beyond ~18-19!", why:"Double's exact-integer limit",
+   body:"Once factorial results exceed 2^53, double can no longer represent every integer exactly — you start seeing values that are close to correct but not bit-for-bit exact (as seen with 25! in the output).",
+   trap:"The precision loss is GRADUAL, not a sudden cliff — results become progressively less exact as they grow larger, which can be misleading if you're not watching for it."},
+  {tok:"bignum as the ultimate fix", why:"Arbitrary-precision arithmetic",
+   body:"For factorials beyond double's exact range, a 'bignum' representation (storing digits in an array and doing manual digit-by-digit multiplication) can represent arbitrarily large integers exactly, at the cost of much more complex arithmetic code.",
+   trap:"Implementing bignum arithmetic from scratch is a substantial undertaking — for serious need, using an existing arbitrary-precision library (like GMP) is far more practical than hand-rolling one."}
+ ],
+ code:[
+  {t:'<span class="cm">// int version silently overflows past 12!</span>',hl:true},
+  {t:'<span class="ty">int</span> overflowDemo=<span class="num">1</span>;'},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">1</span>;i&lt;=<span class="num">13</span>;i++){ overflowDemo*=i; }',note:"13! exceeds INT_MAX — wraps to garbage silently.",hl:true},
+  {t:'<span class="ty">double</span> <span class="fn">factorialDouble</span>(<span class="ty">int</span> n){'},
+  {t:'  <span class="kw">if</span>(n&lt;=<span class="num">1</span>) <span class="kw">return</span> <span class="num">1.0</span>;'},
+  {t:'  <span class="kw">return</span> n*<span class="fn">factorialDouble</span>(n-<span class="num">1</span>);',note:"double's much larger range handles far bigger factorials correctly.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"13! in int (overflow) vs double (correct)",
+  vars:["int result","double result"],
+  steps:[
+   {desc:"int: multiplying 1×2×3×...×13 overflows INT_MAX partway through",set:{"int result":"1932053504 (garbage!)"},chg:["int result"]},
+   {desc:"double: same multiplication stays within double's exact range",set:{"double result":"6227020800 (correct!)"},chg:["double result"]},
+   {desc:"double at 20!: still exact (2432902008176640000)",set:{},chg:[]},
+   {desc:"double at 25!: <span class='exec'>precision starts slipping</span> — the exact value has more significant digits than double can represent",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"13! computed with int (overflowed): 1932053504"},
+  {o:"13! computed with double: 6227020800"},
+  {o:"20! computed with double: 2432902008176640000"},
+  {o:"25! computed with double (precision lost): 15511210043330986055303168"},
+  {o:"Double's exact-integer range ends around 2^53, between 18! and 19!."}
+ ],
+ better:{
+  naive:"double delays the overflow problem substantially but doesn't eliminate it — for TRUE arbitrary precision, a bignum representation is required.",
+  improvements:[
+   "<b>Use double for factorials up to about 18!</b> where it remains exact — a huge improvement over int's 12! limit, at zero implementation cost.",
+   "<b>For larger factorials needing EXACT values</b>, implement (or use a library for) bignum arithmetic: represent the number as an array of digits and perform manual multiplication, digit by digit, with carrying.",
+   "<b>Recognize the tradeoff</b>: int is fast but limited, double extends the range but eventually loses exactness, and bignum is exact but significantly slower and more complex to implement."
+  ],
+  complexity:["int/double factorial: O(n) time","Bignum factorial: O(n × d) where d is the growing number of digits — asymptotically superlinear due to digit growth"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Does computing 13! with a plain int produce a crash or a silently wrong answer?",
+   opts:["Crashes immediately","Silently wraps to a wrong value with no warning — that's the real danger","Compile error","Returns 0"],ans:1,
+   exp:"<b>Silent wrong answer.</b> C gives no automatic overflow detection for signed int arithmetic — the result is simply incorrect, discoverable only by manually checking against the known correct value."},
+  {type:"spot-the-bug",q:"Roughly where does double start losing EXACT integer precision for factorials?",
+   opts:["Immediately, at 1!","Around 18-19!, once results exceed 2^53","Never, double is infinite precision","At 100!"],ans:1,
+   exp:"<b>Around 18-19!.</b> double's mantissa can exactly represent integers up to 2^53 (~9 quadrillion); 18! is just under that, while 19! and beyond start exceeding it."},
+  {type:"fill-in-the-blank",q:"For factorials requiring exact precision far beyond double's range, a ____ (arbitrary-precision) representation is needed.",
+   answer:"bignum",exp:"Bignum arithmetic stores numbers as digit arrays and performs manual multiplication, enabling exact results of any size at the cost of speed and complexity."}
+ ]
+},
+{
+ id:"pq100", unit:"Unit 4", tab:"Q100 · Dangling pointer",
+ title:"Returning a pointer to a local variable",
+ question:"A pointer to a local variable is returned from a function. What happens at the memory level? Show intermittent corruption.",
+ aim:"Watch a returned local's address appear to 'work' momentarily, then get silently overwritten by later stack usage.",
+ file:"q100.c",
+ syntax:[
+  {tok:"return &local — the fundamental bug", why:"Returning an address that's about to become invalid",
+   body:"<code>local</code> lives on the function's stack frame. The moment the function returns, that stack frame is considered 'free' for reuse by whatever gets called next — the pointer now refers to memory that's no longer reserved for that value.",
+   trap:"The compiler actually WARNS about this specific pattern (<code>-Wreturn-local-addr</code>) precisely because it's such a common and dangerous mistake — always heed this warning."},
+  {tok:"why it can 'look correct' immediately", why:"Nothing has overwritten the memory YET",
+   body:"Right after the function returns, the stack memory still physically contains the old value — no other function has run yet to overwrite it, so a naive test right away might seem to work by pure luck.",
+   trap:"This 'it works on my machine' illusion is exactly what makes dangling pointer bugs so insidious — they can pass casual testing and fail unpredictably later, or on a different compiler/platform."},
+  {tok:"corruption after calling another function", why:"The stack memory gets reused",
+   body:"Once ANY other function is called (which uses stack space), it's very likely to overwrite the same memory region the dangling pointer refers to — silently corrupting the 'value' the pointer seems to still point to.",
+   trap:"This is genuinely undefined behavior — the exact moment and nature of corruption isn't guaranteed, making this bug notoriously difficult to reproduce and debug consistently."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span>* <span class="fn">dangling</span>(){'},
+  {t:'  <span class="ty">int</span> local=<span class="num">42</span>; <span class="cm">// lives on THIS function\'s stack frame</span>'},
+  {t:'  <span class="ty">int</span> *ptr=&amp;local;'},
+  {t:'  <span class="kw">return</span> ptr; <span class="cm">// BUG: returns address of a variable about to be destroyed!</span>',note:"The compiler even warns about this exact pattern.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">noisyFunction</span>(){'},
+  {t:'  <span class="ty">int</span> junk[<span class="num">10</span>]={<span class="num">111</span>,<span class="num">222</span>,...,<span class="num">1000</span>}; <span class="cm">// reuses the SAME stack region</span>',note:"This overwrites the memory the dangling pointer refers to.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> *p = <span class="fn">dangling</span>(); <span class="cm">// p now points to a DEAD stack frame</span>',hl:true},
+  {t:'<span class="fn">printf</span>(<span class="str">"*p = %d\\n"</span>, *p); <span class="cm">// may look correct — nothing has overwritten it yet</span>'},
+  {t:'<span class="fn">noisyFunction</span>(); <span class="cm">// reuses that stack memory</span>'},
+  {t:'<span class="fn">printf</span>(<span class="str">"*p = %d\\n"</span>, *p); <span class="cm">// now corrupted!</span>',note:"Same pointer, different (wrong) value — the stack memory was overwritten."}
+ ],
+ mem:{
+  title:"The lifecycle of a dangling pointer",
+  vars:["local (in dangling())","p (in main)","stack region"],
+  steps:[
+   {desc:"Inside dangling(): local=42, occupying a specific stack address",set:{"local (in dangling())":"42"},chg:["local (in dangling())"]},
+   {desc:"dangling() returns. Its stack frame is now considered 'free' — but the value 42 is still physically THERE, just not reserved anymore",set:{"p (in main)":"points to that now-'free' address"},chg:["p (in main)"]},
+   {desc:"Immediately checking *p: reads <span class='exec'>42</span> — appears correct purely by luck, nothing has overwritten it yet",set:{},chg:[]},
+   {desc:"noisyFunction() runs, using the SAME stack region for its own local array — <span class='exec'>*p now reads 1000</span> (corrupted!)",set:{"stack region":"overwritten by junk[]"},chg:["stack region"]}
+  ]
+ },
+ output:[
+  {o:"Immediately after: *p = 42 (may look correct by luck)"},
+  {o:"After calling another function: *p = 1000 (corrupted!)"}
+ ],
+ better:{
+  naive:"This bug (returning a pointer to a local) is not really 'fixable' by tweaking the approach — it's fundamentally wrong and needs a different design entirely.",
+  improvements:[
+   "<b>Return by value instead</b>: if you just need the VALUE, return <code>int</code> (not <code>int*</code>) directly — the value gets copied out before the frame is destroyed, which is completely safe.",
+   "<b>Use dynamic allocation</b> (malloc) if you genuinely need a pointer that outlives the function — but remember the caller must then free() it.",
+   "<b>Use a static variable</b> (with caveats about thread-safety and reentrancy) if a single persistent instance is acceptable — less common but valid in specific single-threaded contexts.",
+   "<b>Always heed compiler warnings</b> like <code>-Wreturn-local-addr</code> — this exact bug pattern is specifically flagged because it's so dangerous and common."
+  ],
+  complexity:["This is a correctness/memory-safety issue, not a performance one","The 'cost' is unpredictable, hard-to-reproduce corruption"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why might *p appear to correctly show 42 immediately after calling dangling(), despite the bug?",
+   opts:["The bug doesn't actually exist","The stack memory still physically holds the old value until something else overwrites it","C automatically fixes this","It's actually safe to do this"],ans:1,
+   exp:"<b>Lucky timing.</b> Stack memory isn't immediately erased when a function returns — it's just marked as available for reuse. Until another function actually uses that space, the old value is still physically present, creating a false sense of correctness."},
+  {type:"spot-the-bug",q:"What is the fundamentally correct fix for a function that needs to give the caller a value from a local variable?",
+   opts:["Use more stack space","Return the value directly (by value), not a pointer to the local variable","Add more local variables","Call the function twice"],ans:1,
+   exp:"<b>Return by value.</b> If you return <code>int</code> instead of <code>int*</code>, the value is COPIED out before the stack frame is destroyed — completely safe, since no pointer to freed stack memory is ever created."},
+  {type:"fill-in-the-blank",q:"Returning a pointer to a local variable creates a ____ pointer — one that refers to memory no longer reserved for that value.",
+   answer:"dangling",exp:"A dangling pointer refers to memory that's been freed or reused, making any subsequent dereference undefined behavior."}
+ ]
+}
+);
 
 </script>
 <script>
 /* ================= C-LAB APP ================= */
-const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: (typeof PRACTICE_U3!=='undefined'?PRACTICE_U3:[]), 4: [], 5: [] };
+const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: (typeof PRACTICE_U3!=='undefined'?PRACTICE_U3:[]), 4: (typeof PRACTICE_U4!=='undefined'?PRACTICE_U4:[]), 5: [] };
 const UNIT_RANGES = {1:"1–25",2:"26–50",3:"51–75",4:"76–100",5:"101–125"};
 
 const state = { mode:'lab', unit:1, active:0, done:new Set(), quizScore:0, quizMax:0, quizAnswered:new Set() };
