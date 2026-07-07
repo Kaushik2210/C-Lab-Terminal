@@ -266,7 +266,7 @@ Free to use, modify, and distribute.
 
 Made with ❤️ for **MCA Batch 2026–2028**
 
-**Problem Solving Using C • Smart Retail & Inventory Management**
+**Problem Solving Using C**
 
 ⭐ If this project helped you prepare for your lab, consider giving it a star!
 
