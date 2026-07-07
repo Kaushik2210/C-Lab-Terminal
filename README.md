@@ -1,96 +1,273 @@
 # C-Lab Terminal
 
-**An interactive study companion for MCA412-1 — Problem Solving Using C.**
+## 📖 Overview
 
+**C Lab Terminal** transforms the traditional MCA412-1 **Problem Solving Using C** lab manual into an interactive learning experience.
+
+Instead of simply reading code, you can:
+
+- 🔍 Explore C syntax interactively
+- 📜 Understand every line of code
+- 🧠 Visualise memory changes during execution
+- 🧪 Test your understanding with quizzes
+- 📈 Track your learning progress
+
+
+
+> **Single self-contained HTML application**
+>
+> - ✅ No frameworks
+> - ✅ No dependencies
+> - ✅ No installation
+> - ✅ Fully offline
+> - ✅ Works in any modern browser
+
+---
+
+## 🌐 Live Demo
 
 **Deployed Link:https://c-lab-terminal-v-1.vercel.app/**
 
-
-Every program from the lab manual, dismantled and rebuilt: syntax you can poke, code you reveal line by line, memory you watch change, and quizzes that actually score you. Built around the manual's own Smart Retail & Inventory Management domain, with a point-of-sale receipt aesthetic.
-
-It's a single, self-contained HTML file. No build step, no dependencies, no internet required.
-
 ---
 
-## Demo
+## 🚀 Quick Start
 
-Open `c_lab_terminal.html` in any modern browser. That's it.
+Clone the repository:
 
 ```bash
-# clone, then just open the file
-git clone https://github.com/<your-username>/c-lab-terminal.git
-cd c-lab-terminal
-# macOS
-open c_lab_terminal.html
-# Linux
-xdg-open c_lab_terminal.html
-# Windows
-start c_lab_terminal.html
+git clone https://github.com/Kaushik2210/C-Lab-Terminal.git
+cd C-Lab-Terminal
 ```
 
-To host it live on **GitHub Pages**: push to a repo, then go to **Settings → Pages → Deploy from branch → main / root**. Your app will be at `https://<your-username>.github.io/<repo-name>/c_lab_terminal.html`.
+Open the application:
+
+### macOS
+
+```bash
+open index.html
+```
+
+### Linux
+
+```bash
+xdg-open index.html
+```
+
+### Windows
+
+Simply double-click **index.html**
+
+No installation or build process required.
 
 ---
 
-## Features
-
-Each of the 8 lab programs is broken into five collapsible sections:
-
-1. **Syntax Breakdown** — tap any element (`scanf`, `*s`, `strcmp`, `switch`, `fopen`…) to reveal what it does, *why it's used in this specific program*, and the common trap students fall into.
-2. **Line-by-Line Walkthrough** — dark, syntax-highlighted code; click any highlighted line to reveal the reasoning behind it.
-3. **Execution & Memory** — a live memory stepper. Step forward and back to watch variables change cell by cell (including pointer arrows and struct-to-file flow), alongside a terminal showing real input/output.
-4. **Storage & The Better Version** — naive vs. expert side-by-side, with concrete rewrites (bounded `scanf`, `NULL` checks, struct padding, integer cents for money) and time/space complexity badges.
-5. **Test Me** — scored quizzes: predict-the-output, spot-the-bug, and fill-in-the-blank, each with an explanation that unlocks after you answer.
-
-Plus a global progress bar, per-program completion marking with auto-advance, and a running quiz-points counter.
-
----
-
-## Programs covered
+## 📚 Programs Covered
 
 | # | Unit | Program | Concepts |
 |---|------|---------|----------|
-| 1 | 1 | Retail Invoice Generator | Arithmetic, relational, logical, ternary & shorthand operators |
-| 2 | 1 | Inventory Valuation & Tax Calculator | Operator precedence & associativity |
-| 3 | 2 | Automated Checkout System | `if-else`, `while`, `switch-case`, `break`/`continue` |
-| 4 | 3 | Warehouse Aisle-Shelf Mapper | 2D arrays, nested loops, row-major traversal |
-| 5 | 3 | Product Branding Validator | `strlen`, `strcpy`, `strcmp`, char arrays |
-| 6 | 4 | Modular Tax & Discount Calculator | Functions, return values, pass-by-value |
-| 7 | 4 | Global Stock Synchronizer | Pointers, dereferencing, call-by-reference |
-| 8 | 5 | Mini Retail Ledger | Structures, file handling, `fopen`/`fprintf`/`fclose` |
+| 1 | Unit 1 | Retail Invoice Generator | Arithmetic, Relational, Logical, Ternary & Shorthand Operators |
+| 2 | Unit 1 | Inventory Valuation & Tax Calculator | Operator Precedence & Associativity |
+| 3 | Unit 2 | Automated Checkout System | if-else, while, switch-case, break, continue |
+| 4 | Unit 3 | Warehouse Aisle-Shelf Mapper | 2D Arrays, Nested Loops, Row-major Traversal |
+| 5 | Unit 3 | Product Branding Validator | Strings, strlen(), strcpy(), strcmp() |
+| 6 | Unit 4 | Modular Tax & Discount Calculator | Functions, Return Values, Pass-by-Value |
+| 7 | Unit 4 | Global Stock Synchronizer | Pointers, Dereferencing, Call-by-Reference |
+| 8 | Unit 5 | Mini Retail Ledger | Structures, File Handling (fopen, fprintf, fclose) |
+
+Plus, additional practice: 125 questions are explained in a detailed manner to boost understanding!!
+---
+
+# ✨ Features
+
+Every program is divided into **five interactive learning modules**.
+
+## 🔍 Syntax Breakdown
+
+Click on C keywords and functions such as:
+
+- `scanf()`
+- `strcmp()`
+- `switch`
+- `fopen()`
+- `*ptr`
+
+to learn:
+
+- what they do
+- why they're used
+- common mistakes students make
 
 ---
 
-## Tech
+## 📜 Line-by-Line Walkthrough
 
-- Plain **HTML + CSS + vanilla JavaScript** — no frameworks, no dependencies.
-- Single file (~76 KB). Fully offline. Works on desktop and mobile.
-- All content and interaction logic is embedded; nothing loads from a CDN.
+Every line of code includes detailed explanations so you understand the logic—not just the syntax.
 
 ---
 
-## Project structure
+## 🧠 Execution & Memory Visualizer
+
+Watch your program execute step-by-step.
+
+Visualize:
+
+- Variables
+- Arrays
+- Pointers
+- Structures
+- Terminal I/O
+
+in real time.
+
+---
+
+## 💡 Better Version
+
+Compare:
+
+- Beginner implementation
+- Improved implementation
+
+with explanations covering:
+
+- safer code
+- better programming practices
+- complexity analysis
+- common optimizations
+
+---
+
+## 🧪 Test Me
+
+Interactive quizzes including:
+
+- Predict the output
+- Spot the bug
+- Fill in the blank
+
+Each quiz provides explanations after submission and contributes to your overall score.
+
+---
+
+## 🎯 Additional Features
+
+- 📊 Progress tracking
+- ✅ Program completion indicators
+- ⚡ Auto-advance between modules
+- 🏆 Quiz score tracking
+- 📱 Responsive design
+- 🌙 Modern terminal-inspired interface
+- 💾 Fully offline support
+
+---
+
+## 🛠 Tech Stack
+
+- HTML5
+- CSS3
+- Vanilla JavaScript
+
+No frameworks.
+
+No libraries.
+
+No build tools.
+
+Everything runs from a single HTML file.
+
+---
+
+## 📂 Project Structure
+
+```text
+C-Lab-Terminal/
+│
+├── index.html          # Complete application
+├── README.md
+└── LICENSE
+```
+
+---
+
+## 🌍 Deploying to GitHub Pages
+
+1. Push the project to GitHub.
+2. Open:
 
 ```
-c-lab-terminal/
-├── c_lab_terminal.html   # the entire app — open this
-└── README.md
+Settings → Pages
+```
+
+3. Under **Build and Deployment**
+
+```
+Deploy from Branch
+```
+
+4. Select
+
+```
+main
+/
+(root)
+```
+
+Your website will be available at:
+
+```
+https://<username>.github.io/C-Lab-Terminal/
 ```
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
-The program data lives in a `PROGRAMS` array inside the file. Each entry follows a consistent shape (`syntax`, `code`, `mem`, `output`, `better`, `quiz`), so adding a new program or quiz question is mostly a matter of copying the pattern. Pull requests that add practice-question breakdowns or fix any technical inaccuracy are welcome.
+The application is driven by a structured `PROGRAMS` array inside `index.html`.
+
+Each program contains:
+
+- Syntax explanations
+- Code walkthrough
+- Memory visualization
+- Better implementation
+- Quiz
+
+Contributions are welcome!
+
+Feel free to submit:
+
+- Bug fixes
+- UI improvements
+- Additional explanations
+- New quiz questions
+- Better animations
 
 ---
 
-## Disclaimer
+## ⚠ Disclaimer
 
-This is a **study aid**, not something to submit for assessment. The MCA412-1 course follows the department's AI policy for all graded work — use this to understand the material, then write your own code.
+This project is intended **only as a learning resource**.
+
+Please follow your university's academic integrity and AI usage policies.
+
+Understand the concepts and write your own code during assessments.
 
 ---
 
-## License
+## 📄 License
 
-Released under the [MIT License](LICENSE). Free to use, modify, and share.
+Released under the **MIT License**.
+
+Free to use, modify, and distribute.
+
+---
+
+<div align="center">
+
+Made with ❤️ for **MCA Batch 2026–2028**
+
+**Problem Solving Using C • Smart Retail & Inventory Management**
+
+⭐ If this project helped you prepare for your lab, consider giving it a star!
+
+</div>
