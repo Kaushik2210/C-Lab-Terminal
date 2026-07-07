@@ -6829,11 +6829,1624 @@ PRACTICE_U4.push(
  ]
 }
 );
+/* ===== PRACTICE QUESTIONS — UNIT 5 (Q101–113) ===== */
+const PRACTICE_U5 = [
+{
+ id:"pq101", unit:"Unit 5", tab:"Q101 · Nested structs",
+ title:"A university structure hierarchy",
+ question:"Design nested structures: University → Department → Course → Student. Find the department with the highest average GPA.",
+ aim:"Nest structs inside structs (and arrays of structs) to model a real-world containment hierarchy.",
+ file:"q101.c",
+ syntax:[
+  {tok:"struct containing an array of another struct", why:"Modeling one-to-many relationships",
+   body:"A <code>Department</code> contains an array of <code>Student</code> structs plus a count — exactly how you represent 'one department has many students' in plain C.",
+   trap:"Fixed-size arrays (like <code>Student students[10]</code>) cap how many students a department can hold — a real limitation for a rigid struct-based design."},
+  {tok:"pointer parameter into the nested structure", why:"Operate on one nested piece without copying",
+   body:"<code>deptAvgGPA(Department *d)</code> receives a pointer to just ONE department, letting it read that department's own array of students directly.",
+   trap:"Passing the whole Department by value would copy its entire student array unnecessarily — pointers avoid this."},
+  {tok:"iterating hierarchy levels with nested loops", why:"Walk from University down to Students",
+   body:"A loop over departments, and within it a loop over that department's students, mirrors the nesting structure itself — the code's shape matches the data's shape.",
+   trap:"Trying to flatten the hierarchy into parallel arrays instead of nested structs loses the natural containment relationship and complicates bookkeeping."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">30</span>]; <span class="ty">float</span> gpa; } Student;'},
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">30</span>]; Student students[<span class="num">10</span>]; <span class="ty">int</span> studentCount; } Department;',note:"A Department CONTAINS an array of Students — one-to-many nesting.",hl:true},
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">30</span>]; Department depts[<span class="num">5</span>]; <span class="ty">int</span> deptCount; } University;',note:"University contains Departments, which contain Students — a 3-level hierarchy."},
+  {t:'<span class="ty">float</span> <span class="fn">deptAvgGPA</span>(Department *d){'},
+  {t:'  <span class="ty">float</span> sum=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;d->studentCount;i++) sum+=d->students[i].gpa;',note:"Reach two levels deep: d->students[i].gpa.",hl:true},
+  {t:'  <span class="kw">return</span> d->studentCount? sum/d->studentCount : <span class="num">0</span>;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Comparing CS (2 students) vs Math (1 student)",
+  vars:["dept","studentCount","sum GPA","avg"],
+  steps:[
+   {desc:"CS: students=[Asha(3.8), Ravi(3.6)], count=2",set:{dept:"CS",studentCount:"2","sum GPA":"7.4"},chg:["dept","studentCount","sum GPA"]},
+   {desc:"CS avg = 7.4/2 = 3.70",set:{avg:"3.70"},chg:["avg"]},
+   {desc:"Math: students=[Priya(3.9)], count=1. avg = 3.9/1 = 3.90",set:{dept:"Math",studentCount:"1",avg:"3.90"},chg:["dept","studentCount","avg"]},
+   {desc:"<span class='exec'>Math (3.90) beats CS (3.70)</span> despite having fewer students",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"CS avg GPA: 3.70"},
+  {o:"Math avg GPA: 3.90"},
+  {o:"Highest avg GPA department: Math (3.90)"}
+ ],
+ better:{
+  naive:"Fixed-size arrays at every level (10 students, 5 departments) impose rigid caps that don't scale to a real university's size.",
+  improvements:[
+   "<b>Use dynamic arrays</b> (malloc'd, resizable) at each level instead of fixed-size arrays, to handle universities of any size.",
+   "<b>Add a Course level</b> (as the question's full hierarchy specifies) between Department and Student, if students need to be grouped by course rather than just department.",
+   "<b>Consider whether 'average of averages' vs 'average of all individual grades'</b> matters for your use case — averaging department-level averages can differ subtly from a true grand mean if department sizes vary."
+  ],
+  complexity:["Time: O(total students) to compute all averages","Space: O(depts × students per dept) — bounded by the fixed array sizes"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Which department has the higher average GPA: CS (students at 3.8, 3.6) or Math (single student at 3.9)?",
+   opts:["CS","Math","Tied","Cannot determine"],ans:1,
+   exp:"<b>Math.</b> CS averages (3.8+3.6)/2=3.70, while Math's single student average is 3.90 — higher despite having fewer students."},
+  {type:"spot-the-bug",q:"Why pass <code>Department *d</code> (a pointer) to deptAvgGPA instead of the whole Department by value?",
+   opts:["No difference","Passing by value would copy the entire nested student array unnecessarily","Required syntax","Faster by value"],ans:1,
+   exp:"<b>Avoid wasteful copying.</b> A Department struct contains a whole array of Students — copying that by value for every function call would be needlessly expensive; a pointer avoids the copy."},
+  {type:"fill-in-the-blank",q:"To access a specific student's GPA from a Department pointer, you write <code>d->students[i].____</code>.",
+   answer:"gpa",exp:"Arrow to reach into the Department, then array indexing, then dot to reach the Student's gpa field."}
+ ]
+},
+{
+ id:"pq102", unit:"Unit 5", tab:"Q102 · Binary/text mode",
+ title:"Binary vs text mode file portability",
+ question:"A file is written in binary mode, read in text mode. What goes wrong on Windows vs Linux? Redesign for portability.",
+ aim:"Understand how text mode's newline translation can silently corrupt binary data on some platforms.",
+ file:"q102.c",
+ syntax:[
+  {tok:"\"wb\" / \"rb\" — binary mode", why:"No byte translation whatsoever",
+   body:"Binary mode reads/writes bytes EXACTLY as they are, with zero interpretation or translation — essential for non-text data like raw integers, images, or structs.",
+   trap:"Forgetting the 'b' when working with genuinely binary data (not text) risks platform-dependent corruption."},
+  {tok:"\"w\" / \"r\" — text mode", why:"May translate newlines on some platforms",
+   body:"On Windows, text mode translates between '\\n' (in-memory) and '\\r\\n' (on-disk) automatically. On Linux/Unix, text and binary mode are IDENTICAL — no translation happens either way.",
+   trap:"Code that works perfectly on Linux (where text/binary modes behave the same) can silently corrupt binary data when the same code runs on Windows."},
+  {tok:"why this specific bug is Windows-specific", why:"Platform-dependent behavior",
+   body:"If binary data (like a raw int) happens to contain a byte pattern matching '\\n' (0x0A), Windows' text-mode read/write could translate it, corrupting that byte — Linux has no such translation step to trigger the bug.",
+   trap:"This makes the bug genuinely platform-dependent — code can pass all testing on a Linux development machine and only fail once deployed to Windows."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> data[<span class="num">3</span>]={<span class="num">100</span>,<span class="num">200</span>,<span class="num">300</span>};'},
+  {t:'FILE *fp = <span class="fn">fopen</span>(<span class="str">"bindata.bin"</span>,<span class="str">"wb"</span>);',note:"Binary write mode — no translation.",hl:true},
+  {t:'<span class="fn">fwrite</span>(data,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">3</span>,fp); <span class="fn">fclose</span>(fp);'},
+  {t:'fp = <span class="fn">fopen</span>(<span class="str">"bindata.bin"</span>,<span class="str">"r"</span>); <span class="cm">// WRONG mode for binary data!</span>',note:"Text mode reading binary data — risky on Windows.",hl:true},
+  {t:'<span class="ty">int</span> check; <span class="fn">fread</span>(&amp;check,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">1</span>,fp);'},
+  {t:'<span class="cm">// On Linux: works fine, text/binary modes are identical</span>'},
+  {t:'<span class="cm">// On Windows: could corrupt any byte matching \\n (0x0A) during translation</span>',hl:true},
+  {t:'fp=<span class="fn">fopen</span>(<span class="str">"bindata.bin"</span>,<span class="str">"rb"</span>); <span class="cm">// CORRECT — always match the mode used to write</span>',note:"Portable fix: use binary mode consistently.",hl:true}
+ ],
+ mem:{
+  title:"Reading binary data with mismatched modes",
+  vars:["mode used","platform","result"],
+  steps:[
+   {desc:"Write with 'wb' (binary) — data stored exactly as raw bytes",set:{"mode used":"wb"},chg:["mode used"]},
+   {desc:"Read with 'r' (text) on Linux: no translation happens, value reads correctly BY COINCIDENCE of platform",set:{platform:"Linux",result:"100 (correct, but for the wrong reason)"},chg:["platform","result"]},
+   {desc:"Read with 'r' (text) on Windows: potential \\r\\n translation could corrupt bytes matching those patterns",set:{platform:"Windows",result:"POTENTIALLY corrupted"},chg:["platform","result"]},
+   {desc:"Read with 'rb' (binary) on EITHER platform: <span class='exec'>always correct</span> — the safe, portable choice",set:{platform:"any",result:"100 (always correct)"},chg:["platform","result"]}
+  ]
+ },
+ output:[
+  {o:"Reading binary file in text mode: read 1 items, value=100 (may be corrupted on Windows due to \\r\\n translation)"},
+  {o:"Reading in correct binary mode: value=100"},
+  {o:"On Linux, text/binary mode are identical (no CRLF translation), so this bug is Windows-specific."}
+ ],
+ better:{
+  naive:"Mixing text/binary modes 'by accident' is a classic portability trap that only manifests on certain platforms, making it easy to miss during Linux-only development and testing.",
+  improvements:[
+   "<b>Always match the mode</b> used for writing when later reading — 'wb' data should always be reopened with 'rb', never plain 'r'.",
+   "<b>For genuinely binary data</b> (structs, raw numbers, images), ALWAYS use binary mode ('b' suffix) regardless of target platform — it's never wrong, even on Linux where it happens to behave identically to text mode.",
+   "<b>Test on multiple platforms</b> if portability matters — a Linux-only test suite can hide this exact class of bug indefinitely."
+  ],
+  complexity:["Time: O(1) — the fix costs nothing, it's purely about mode correctness","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Does this specific text/binary mode mismatch cause a bug when running on Linux?",
+   opts:["Yes, always corrupts","No — Linux's text and binary modes are identical, no translation occurs either way","Only for large files","Only for negative numbers"],ans:1,
+   exp:"<b>No bug on Linux.</b> Linux (and Unix generally) doesn't distinguish text and binary file modes at the OS level — no newline translation happens in either mode."},
+  {type:"spot-the-bug",q:"Why is this bug specifically associated with Windows?",
+   opts:["Windows has more bugs generally","Windows' text mode translates between \\n and \\r\\n, which can corrupt binary data containing those byte patterns","Windows doesn't support binary files","No real platform difference"],ans:1,
+   exp:"<b>Windows' newline translation.</b> Text mode on Windows actively converts between in-memory \\n and on-disk \\r\\n — a real transformation that can corrupt binary data if it happens to contain matching byte values."},
+  {type:"fill-in-the-blank",q:"The portable fix is to always use ____ mode (with the 'b' suffix) for non-text data, on any platform.",
+   answer:"binary",exp:"Binary mode ('rb'/'wb') never performs newline translation, making it safe and consistent across all platforms."}
+ ]
+},
+{
+ id:"pq103", unit:"Unit 5", tab:"Q103 · Phone directory",
+ title:"A phone directory with full CRUD and persistence",
+ question:"Array of structs (name, phone, email). Support add, search, delete, save to file, load from file.",
+ aim:"Combine array-based storage with linear search and shift-based deletion, plus simple CSV-style file persistence.",
+ file:"q103.c",
+ syntax:[
+  {tok:"global array + count pattern", why:"Simple persistent storage for the session",
+   body:"A fixed-size array (<code>directory[100]</code>) plus a running <code>count</code> tracks how many entries are actually in use — a common, simple pattern for small in-memory datasets.",
+   trap:"Fixed capacity (100 here) means the directory silently can't grow beyond that without redesigning to dynamic allocation."},
+  {tok:"searchByName — linear scan", why:"Find an entry's index by name",
+   body:"A simple loop compares each entry's name with <code>strcmp</code>, returning the matching index or -1 if not found — the foundation both search AND delete build on.",
+   trap:"For frequently-searched large directories, linear O(n) search is inefficient — a hash table or sorted array with binary search would scale better."},
+  {tok:"deleteByName — shift elements left", why:"Remove a gap by shifting",
+   body:"After finding the target index, shifting every subsequent element one position left (overwriting the deleted entry) and decrementing count removes it while keeping the array contiguous.",
+   trap:"Shifting in the WRONG direction, or forgetting to decrement count, would either corrupt data or leave a 'ghost' duplicate of the last entry."},
+  {tok:"saveToFile — simple CSV-style output", why:"Persist to disk",
+   body:"Writing one comma-separated line per contact creates a simple, human-readable persistence format that could later be re-parsed to reload the directory.",
+   trap:"This simple format breaks if any field itself contains a comma — a more robust format would need proper escaping or a different delimiter."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">30</span>]; <span class="ty">char</span> phone[<span class="num">15</span>]; <span class="ty">char</span> email[<span class="num">40</span>]; } Contact;'},
+  {t:'Contact directory[<span class="num">100</span>]; <span class="ty">int</span> count=<span class="num">0</span>;',note:"Fixed-size array + running count — simple session storage."},
+  {t:'<span class="ty">int</span> <span class="fn">searchByName</span>(<span class="ty">const char</span>*n){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;count;i++) <span class="kw">if</span>(<span class="fn">strcmp</span>(directory[i].name,n)==<span class="num">0</span>) <span class="kw">return</span> i;',note:"Linear scan for a matching name.",hl:true},
+  {t:'  <span class="kw">return</span> -<span class="num">1</span>;'},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">deleteByName</span>(<span class="ty">const char</span>*n){'},
+  {t:'  <span class="ty">int</span> idx=<span class="fn">searchByName</span>(n); <span class="kw">if</span>(idx==-<span class="num">1</span>) <span class="kw">return</span> <span class="num">0</span>;'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=idx;i&lt;count-<span class="num">1</span>;i++) directory[i]=directory[i+<span class="num">1</span>];',note:"Shift everything after idx one step left, closing the gap.",hl:true},
+  {t:'  count--; <span class="kw">return</span> <span class="num">1</span>;'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Adding Asha and Ravi, then deleting Asha",
+  vars:["directory[0]","directory[1]","count"],
+  steps:[
+   {desc:"addContact('Asha',...): directory[0]='Asha', count=1",set:{"directory[0]":"Asha",count:"1"},chg:["directory[0]","count"]},
+   {desc:"addContact('Ravi',...): directory[1]='Ravi', count=2",set:{"directory[1]":"Ravi",count:"2"},chg:["directory[1]","count"]},
+   {desc:"deleteByName('Asha'): idx=0 found. Shift directory[1]→directory[0]",set:{"directory[0]":"Ravi (shifted)"},chg:["directory[0]"]},
+   {desc:"count-- → <span class='exec'>count=1</span>. Ravi is now the only (and first) entry",set:{count:"1"},chg:["count"]}
+  ]
+ },
+ output:[
+  {o:"Found Ravi at index 1: phone=555-5678"},
+  {o:"After delete, count=1, first entry=Ravi"},
+  {o:"Saved to contacts.txt"}
+ ],
+ better:{
+  naive:"O(n) search and O(n) shift-based deletion are fine for small directories, but scale poorly for large ones — thousands of contacts would notice the linear cost.",
+  improvements:[
+   "<b>Keep the array sorted by name</b> and use binary search for O(log n) lookups, though insertion/deletion would then need to maintain sort order.",
+   "<b>Add a loadFromFile function</b> (the mirror of saveToFile) to complete the persistence cycle — read the CSV back into the directory array on startup.",
+   "<b>Use dynamic allocation</b> instead of a fixed 100-entry array if the directory needs to grow beyond that cap."
+  ],
+  complexity:["Search: O(n)","Delete: O(n) (search + shift)","Save: O(n)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After deleting 'Asha' from a directory with Asha at index 0 and Ravi at index 1, where does Ravi end up?",
+   opts:["Still at index 1","Shifted to index 0","Deleted too","Duplicated"],ans:1,
+   exp:"<b>Index 0.</b> Deleting Asha shifts every subsequent entry (just Ravi here) one position left, closing the gap left by the removed contact."},
+  {type:"spot-the-bug",q:"What would happen if deleteByName forgot to decrement count after shifting?",
+   opts:["No difference","The last entry would appear duplicated (both the original and shifted-in copy would seem present)","Compile error","Faster deletion"],ans:1,
+   exp:"<b>Ghost duplicate.</b> Without decrementing count, the array still 'contains' one more entry than it actually has valid data for — the old last entry's data lingers at an index that's now logically past the true end."},
+  {type:"fill-in-the-blank",q:"To find a contact's position by name, the function performs a ____ search through the array.",
+   answer:"linear",exp:"searchByName checks each entry in sequence until a match is found or the array is exhausted — O(n) linear search."}
+ ]
+},
+{
+ id:"pq104", unit:"Unit 5", tab:"Q104 · Complex numbers",
+ title:"A complex number struct with arithmetic operations",
+ question:"Define a structure for complex numbers; implement add, subtract, multiply, modulus. Verify (3+4i)×(3-4i)=25+0i.",
+ aim:"Model a mathematical concept as a struct and implement its operations following the actual algebraic rules.",
+ file:"q104.c",
+ syntax:[
+  {tok:"struct {double re, im;}", why:"Real and imaginary parts as two fields",
+   body:"A complex number is fundamentally a PAIR of real numbers — the struct directly mirrors this mathematical structure, one field per component.",
+   trap:"Using float instead of double loses precision for calculations chained across multiple operations."},
+  {tok:"multiplication formula: (a+bi)(c+di) = (ac-bd)+(ad+bc)i", why:"FOIL expansion for complex multiplication",
+   body:"Multiplying two complex numbers requires the FOIL algebraic expansion, tracking that i²=-1 — this is NOT simply multiplying the real parts and imaginary parts separately.",
+   trap:"A common mistake is naively computing <code>r=a.re*b.re; im=a.im*b.im;</code> — that's wrong; you must cross-multiply and account for i²=-1 correctly."},
+  {tok:"modulus = sqrt(re² + im²)", why:"Distance from origin in the complex plane",
+   body:"The modulus (magnitude) of a complex number is its distance from the origin when plotted on the complex plane — computed via the Pythagorean theorem on its real and imaginary parts.",
+   trap:"Forgetting the square root (just computing re²+im²) gives the squared modulus, not the modulus itself."},
+  {tok:"pointer parameters for all operations", why:"Avoid struct copying, allow in-place results",
+   body:"Passing pointers to Complex structs (rather than by value) avoids copying overhead and lets the result be written directly into the caller's chosen struct.",
+   trap:"Passing complex numbers by value would work correctly too (they're small), but pointers are the more idiomatic choice for structs in general C code."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">double</span> re, im; } Complex;',note:"A complex number as a pair of doubles.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">cmul</span>(Complex*a,Complex*b,Complex*r){'},
+  {t:'  r->re = a->re*b->re - a->im*b->im;',note:"Real part: ac - bd (from FOIL, using i²=-1).",hl:true},
+  {t:'  r->im = a->re*b->im + a->im*b->re;',note:"Imaginary part: ad + bc."},
+  {t:'}'},
+  {t:'<span class="ty">double</span> <span class="fn">cmod</span>(Complex*a){ <span class="kw">return</span> <span class="fn">sqrt</span>(a->re*a->re + a->im*a->im); }',note:"Pythagorean distance from origin.",hl:true}
+ ],
+ mem:{
+  title:"Multiplying (3+4i) × (3-4i)",
+  vars:["a","b","r->re","r->im"],
+  steps:[
+   {desc:"a={3,4} (3+4i), b={3,-4} (3-4i)",set:{a:"3+4i",b:"3-4i"},chg:["a","b"]},
+   {desc:"r->re = 3*3 - 4*(-4) = 9 - (-16) = 9+16 = 25",set:{"r->re":"25"},chg:["r->re"]},
+   {desc:"r->im = 3*(-4) + 4*3 = -12 + 12 = 0",set:{"r->im":"0"},chg:["r->im"]},
+   {desc:"<span class='exec'>Result: 25 + 0i</span> — verifying the classic (a+bi)(a-bi)=a²+b² identity",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"(3+4i) x (3-4i) = 25 + 0i"},
+  {o:"(3+4i) + (3-4i) = 6 + 0i"},
+  {o:"|3+4i| = 5.0"}
+ ],
+ better:{
+  naive:"The operations are already correctly implemented following the standard algebraic rules — there's no 'naive' shortcut that would still be mathematically correct for complex multiplication.",
+  improvements:[
+   "<b>Add division</b> (using the conjugate trick: multiply numerator and denominator by the denominator's conjugate) to complete a full arithmetic library.",
+   "<b>Add a formatted print function</b> that correctly handles sign display (e.g. '3 - 4i' instead of '3 + -4i') for cleaner output.",
+   "<b>This exact identity</b> — (a+bi)(a-bi)=a²+b² — is the basis for 'rationalizing' complex denominators, a genuinely useful technique beyond just this verification exercise."
+  ],
+  complexity:["Time: O(1) per operation","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is (3+4i) × (3-4i)?",
+   opts:["9 - 16i","25 + 0i","-7 + 24i","6 + 0i"],ans:1,
+   exp:"<b>25 + 0i.</b> This is the identity (a+bi)(a-bi)=a²+b² = 9+16 = 25, with the imaginary part cancelling to exactly 0."},
+  {type:"spot-the-bug",q:"Why can't complex multiplication just be <code>r.re=a.re*b.re; r.im=a.im*b.im;</code> (multiplying components separately)?",
+   opts:["That's correct","Complex multiplication requires FOIL expansion accounting for i²=-1, with cross-terms","Only works for real numbers","Faster this way"],ans:1,
+   exp:"<b>Needs cross-terms.</b> (a+bi)(c+di) expands to ac+adi+bci+bdi² = (ac-bd)+(ad+bc)i — the real result involves BOTH pairs' products with a sign flip, not just component-wise multiplication."},
+  {type:"fill-in-the-blank",q:"The modulus of a complex number is computed as sqrt(re² + ____²).",
+   answer:"im",exp:"cmod = sqrt(re² + im²) — the Pythagorean distance formula applied to the complex plane."}
+ ]
+},
+{
+ id:"pq105", unit:"Unit 5", tab:"Q105 · fseek navigation",
+ title:"Reading every other integer with fseek",
+ question:"A binary file stores integer arrays. Read every other integer using fseek and ftell. Explain the exact navigation.",
+ aim:"Use fseek's SEEK_CUR mode to skip forward by a fixed byte offset between reads.",
+ file:"q105.c",
+ syntax:[
+  {tok:"fseek(fp, sizeof(int), SEEK_CUR)", why:"Skip forward relative to the current position",
+   body:"<code>SEEK_CUR</code> moves the file pointer relative to WHERE IT CURRENTLY IS, advancing by <code>sizeof(int)</code> bytes — effectively skipping exactly one integer's worth of data.",
+   trap:"Confusing SEEK_CUR (relative) with SEEK_SET (absolute, from file start) leads to skipping the wrong amount if you're not tracking the current position mentally."},
+  {tok:"read-skip-read pattern", why:"Alternate between consuming and skipping",
+   body:"Each loop iteration reads ONE int (advancing the file position by sizeof(int) automatically), then explicitly skips ANOTHER sizeof(int) bytes forward — landing exactly two positions ahead each time.",
+   trap:"Forgetting that fread() ALSO advances the file position means miscounting how far you've actually moved after each read+seek pair."},
+  {tok:"combining fseek's return check with fread", why:"Detect end-of-file gracefully",
+   body:"The while condition checks BOTH that the seek succeeded (didn't run off the end) AND that the subsequent read got exactly 1 item — cleanly stopping at the file's end without extra bookkeeping.",
+   trap:"Not checking these return values could cause reading garbage or looping incorrectly once the file's data is exhausted."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> val;'},
+  {t:'<span class="fn">fread</span>(&amp;val,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">1</span>,fp); <span class="cm">// read the FIRST int</span>',note:"Position now sits right after this first int."},
+  {t:'<span class="fn">printf</span>(<span class="str">"%d "</span>, val);'},
+  {t:'<span class="kw">while</span>(<span class="fn">fseek</span>(fp,<span class="kw">sizeof</span>(<span class="ty">int</span>),SEEK_CUR)==<span class="num">0</span> &amp;&amp; <span class="fn">fread</span>(&amp;val,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">1</span>,fp)==<span class="num">1</span>){',note:"Skip ONE int forward (SEEK_CUR = relative to current position), THEN read the next.",hl:true},
+  {t:'  <span class="fn">printf</span>(<span class="str">"%d "</span>, val);'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Navigating [10,20,30,40,50,60,70,80]",
+  vars:["file position","action","val"],
+  steps:[
+   {desc:"Position 0: fread reads 10. Position now at byte 4 (after int[0])",set:{"file position":"4",action:"read 10",val:"10"},chg:["file position","action","val"]},
+   {desc:"fseek(SEEK_CUR, +4): position moves to byte 8 (skipping int[1]=20)",set:{"file position":"8",action:"skip int[1]"},chg:["file position","action"]},
+   {desc:"fread reads int[2]=30. Position now at byte 12",set:{"file position":"12",action:"read 30",val:"30"},chg:["file position","action","val"]},
+   {desc:"...pattern repeats: skip, read, skip, read → <span class='exec'>10, 30, 50, 70</span> (indices 0,2,4,6)",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Reading every OTHER integer using fseek:"},
+  {o:"10 30 50 70"},
+  {o:"fseek(fp, sizeof(int), SEEK_CUR) skips forward by one int's worth of bytes, landing on every-other element."}
+ ],
+ better:{
+  naive:"For small files, seeking one element at a time is fine; for very large files with a predictable stride pattern, computing absolute offsets with SEEK_SET might be marginally clearer.",
+  improvements:[
+   "<b>Use <code>ftell()</code> to verify your assumptions</b> about the current file position during debugging — print it out to confirm the navigation matches your mental model.",
+   "<b>For reading every Nth element</b> (not just every other), generalize the skip amount to <code>(N-1)*sizeof(int)</code> between reads.",
+   "<b>Consider whether SEEK_SET with computed absolute offsets</b> might be clearer for some access patterns, especially random (non-sequential) access into the file."
+  ],
+  complexity:["Time: O(n/2) reads for n total integers, each O(1)","Space: O(1) — no need to load the whole file"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For the array [10,20,30,40,50,60,70,80], what does this every-other-element read produce?",
+   opts:["10 20 30 40","20 40 60 80","10 30 50 70","80 60 40 20"],ans:2,
+   exp:"<b>10 30 50 70.</b> Starting with the first element, then skipping one int forward before each subsequent read lands on indices 0,2,4,6."},
+  {type:"spot-the-bug",q:"What does <code>SEEK_CUR</code> mean, as opposed to <code>SEEK_SET</code>?",
+   opts:["Same thing","SEEK_CUR moves relative to the CURRENT position; SEEK_SET moves to an ABSOLUTE position from the file start","SEEK_CUR is for text files only","SEEK_SET is deprecated"],ans:1,
+   exp:"<b>Relative vs absolute.</b> SEEK_CUR offsets from wherever the file pointer currently is; SEEK_SET jumps to a fixed byte position counted from the very start of the file."},
+  {type:"fill-in-the-blank",q:"To skip exactly one int forward using fseek, you pass an offset of ____(int) bytes.",
+   answer:"sizeof",exp:"sizeof(int) gives the exact byte size to skip past one integer's worth of data."}
+ ]
+},
+{
+ id:"pq106", unit:"Unit 5", tab:"Q106 · Library system",
+ title:"A library book lending system with CSV export",
+ question:"Structure for a book (ISBN, title, author, year, copies). Implement checkout/return/search; serialize to CSV.",
+ aim:"Model an inventory-with-availability pattern and persist it in a simple, human-readable format.",
+ file:"q106.c",
+ syntax:[
+  {tok:"copies field as availability tracker", why:"Simple stock-counting pattern",
+   body:"Rather than tracking WHICH specific copy is checked out, a simple integer count of available copies is enough for this use case — decrement on checkout, increment on return.",
+   trap:"This simplified model can't track WHO has which copy or WHEN it's due back — a real library system would need per-copy or per-loan records for that."},
+  {tok:"checkout returns three distinct outcomes", why:"Success, failure, and not-found are different cases",
+   body:"Returning 1 (success), 0 (no copies available), or -1 (ISBN not found) lets the caller distinguish 'book exists but unavailable' from 'book doesn't exist at all' — richer than a simple true/false.",
+   trap:"Collapsing these into a single boolean would lose useful information the caller might need to display different messages for."},
+  {tok:"CSV header row + one line per book", why:"Simple structured serialization",
+   body:"Writing a header row followed by comma-separated fields per book creates a format that's both human-readable and could be re-parsed (or opened directly in a spreadsheet program).",
+   trap:"Like Q103, this simple CSV approach breaks if any field (like a title) contains a literal comma — proper CSV escaping would be needed for full robustness."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> isbn[<span class="num">15</span>]; <span class="ty">char</span> title[<span class="num">50</span>]; <span class="ty">char</span> author[<span class="num">30</span>]; <span class="ty">int</span> year; <span class="ty">int</span> copies; } Book;'},
+  {t:'<span class="ty">int</span> <span class="fn">checkout</span>(<span class="ty">const char</span>*isbn){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;bookCount;i++) <span class="kw">if</span>(<span class="fn">strcmp</span>(catalog[i].isbn,isbn)==<span class="num">0</span>){'},
+  {t:'    <span class="kw">if</span>(catalog[i].copies&gt;<span class="num">0</span>){ catalog[i].copies--; <span class="kw">return</span> <span class="num">1</span>; } <span class="kw">return</span> <span class="num">0</span>;',note:"Distinguish 'found but unavailable' (0) from success (1).",hl:true},
+  {t:'  }'},
+  {t:'  <span class="kw">return</span> -<span class="num">1</span>;',note:"ISBN not in catalog at all.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">saveCSV</span>(<span class="ty">const char</span>*filename){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(filename,<span class="str">"w"</span>);'},
+  {t:'  <span class="fn">fprintf</span>(fp,<span class="str">"ISBN,Title,Author,Year,Copies\\n"</span>);',note:"Header row for structure."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;bookCount;i++) <span class="fn">fprintf</span>(fp,<span class="str">"%s,%s,%s,%d,%d\\n"</span>,...);',note:"One comma-separated line per book.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Checking out ISBN 978-1 (3 copies available)",
+  vars:["copies before","checkout result","copies after"],
+  steps:[
+   {desc:"catalog[0].copies = 3 (before checkout)",set:{"copies before":"3"},chg:["copies before"]},
+   {desc:"checkout('978-1'): found, copies>0 → decrement, return 1 (success)",set:{"checkout result":"1 (success)"},chg:["checkout result"]},
+   {desc:"catalog[0].copies now = <span class='exec'>2</span>",set:{"copies after":"2"},chg:["copies after"]}
+  ]
+ },
+ output:[
+  {o:"Checkout 978-1: Success"},
+  {o:"Remaining copies of 978-1: 2"},
+  {o:"Saved catalog to library.csv"}
+ ],
+ better:{
+  naive:"The copies-counter approach can't answer 'who currently has this book' — for a real library system needing due dates and patron tracking, a separate loan-record structure would be needed.",
+  improvements:[
+   "<b>Add a loans table</b> (separate structure tracking book ISBN, patron ID, checkout date, due date) if you need to know WHO has WHAT and WHEN it's due — the simple counter can't support this.",
+   "<b>Add a loadCSV function</b> to complete the persistence cycle, parsing the saved file back into the catalog array on startup.",
+   "<b>Validate ISBN format</b> and reject duplicates when adding new books, to keep the catalog consistent."
+  ],
+  complexity:["Checkout/search: O(n) linear scan","Save: O(n)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After checking out a book with 3 copies available, how many copies remain?",
+   opts:["3 (unchanged)","2","0","4"],ans:1,
+   exp:"<b>2.</b> checkout() decrements copies by exactly 1 upon a successful checkout."},
+  {type:"spot-the-bug",q:"Why does checkout() return THREE different values (1, 0, -1) instead of just true/false?",
+   opts:["No real reason","To distinguish 'success', 'found but no copies available', and 'ISBN not found at all' as three distinct outcomes","Style preference","Required by C"],ans:1,
+   exp:"<b>Richer information.</b> A caller can react differently to 'the book exists but is checked out' (0) versus 'that book isn't even in our catalog' (-1) — a simple boolean would collapse this useful distinction."},
+  {type:"fill-in-the-blank",q:"The CSV format writes one ____ row followed by one line per book record.",
+   answer:"header",exp:"The header row (ISBN,Title,Author,Year,Copies) documents what each comma-separated field represents."}
+ ]
+},
+{
+ id:"pq107", unit:"Unit 5", tab:"Q107 · Struct pass semantics",
+ title:"Struct pass-by-value vs pass-by-pointer",
+ question:"A struct passed by value is modified inside a function, but main's copy is unchanged. Explain with a memory diagram; fix with pass-by-pointer.",
+ aim:"See concretely why struct modifications don't propagate without a pointer, using two side-by-side functions.",
+ file:"q107.c",
+ syntax:[
+  {tok:"void modifyByValue(Rec r)", why:"Receives a full COPY of the struct",
+   body:"When a struct is passed by value, the ENTIRE struct's contents are copied into a new local variable inside the function — modifying that local copy has zero effect on the caller's original.",
+   trap:"This is easy to forget specifically for structs, since with SMALL structs the copy is invisible/free-feeling — the bug is purely semantic, not about performance."},
+  {tok:"void modifyByPointer(Rec *r)", why:"Receives the ADDRESS of the original",
+   body:"With a pointer parameter, <code>r</code> holds the actual memory address of the caller's struct — writing through <code>r->field</code> modifies that EXACT memory, visible to the caller immediately.",
+   trap:"Some beginners think 'pointer' automatically means 'faster' — the REAL reason it matters here is semantic (does the change persist?), not performance."},
+  {tok:"r.score vs r->score", why:"Dot for direct struct, arrow for pointer",
+   body:"Inside modifyByValue, <code>r</code> is a direct Rec, so you use <code>r.score</code>. Inside modifyByPointer, <code>r</code> is a Rec*, so you use <code>r->score</code> (or equivalently <code>(*r).score</code>).",
+   trap:"Using the wrong operator (dot on a pointer, or arrow on a direct struct) is a compile error, though the fix is usually immediately obvious."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">modifyByValue</span>(Rec r){ r.score = <span class="num">999</span>; } <span class="cm">// modifies a COPY only</span>',note:"r is a full copy — this change never leaves the function.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">modifyByPointer</span>(Rec *r){ r->score = <span class="num">999</span>; } <span class="cm">// modifies the ORIGINAL</span>',note:"r holds the ORIGINAL's address — this write is visible everywhere.",hl:true},
+  {t:'Rec s = {<span class="str">"Alice"</span>, <span class="num">50</span>};'},
+  {t:'<span class="fn">modifyByValue</span>(s);',note:"Passes a COPY of s — s itself is untouched."},
+  {t:'<span class="fn">printf</span>(<span class="str">"score=%d\\n"</span>, s.score); <span class="cm">// still 50!</span>'},
+  {t:'<span class="fn">modifyByPointer</span>(&amp;s);',note:"Passes s's ADDRESS — the function reaches the real s."},
+  {t:'<span class="fn">printf</span>(<span class="str">"score=%d\\n"</span>, s.score); <span class="cm">// now 999!</span>'}
+ ],
+ mem:{
+  title:"Two calls, two different outcomes",
+  vars:["s.score (main)","local copy in modifyByValue","address passed to modifyByPointer"],
+  steps:[
+   {desc:"Initially: s.score = 50",set:{"s.score (main)":"50"},chg:["s.score (main)"]},
+   {desc:"modifyByValue(s): a NEW copy 'r' is created on the function's own stack frame. r.score=999 changes ONLY that copy.",set:{"local copy in modifyByValue":"999 (isolated copy)"},chg:["local copy in modifyByValue"]},
+   {desc:"Function returns, its stack frame (and the copy) is discarded. main's s.score is <span class='exec'>STILL 50</span>",set:{"s.score (main)":"50 (unchanged!)"},chg:["s.score (main)"]},
+   {desc:"modifyByPointer(&s): r holds s's REAL address. r->score=999 writes directly to that memory — <span class='exec'>main's s.score becomes 999</span>",set:{"s.score (main)":"999"},chg:["s.score (main)"]}
+  ]
+ },
+ output:[
+  {o:"After pass-by-value: score=50 (unchanged - the function got a copy)"},
+  {o:"After pass-by-pointer: score=999 (changed - the function modified the original)"}
+ ],
+ better:{
+  naive:"This isn't a 'naive vs optimal' situation — pass-by-value and pass-by-pointer are both fully correct C, just with different (and important!) semantics for whether changes propagate.",
+  improvements:[
+   "<b>Use pass-by-value when you WANT isolation</b> — e.g. a function that computes something FROM a struct without needing to modify the caller's copy.",
+   "<b>Use pass-by-pointer when you WANT the function to modify the original</b> — exactly the case demonstrated here.",
+   "<b>For LARGE structs</b>, pass-by-pointer also avoids the performance cost of copying, even when you don't need the modification to persist — pairing with <code>const</code> (<code>const Rec *r</code>) signals 'read-only, but no copy overhead'."
+  ],
+  complexity:["Both: O(1) function call overhead","Pass-by-value: O(struct size) copy cost","Pass-by-pointer: O(1) — just copies the pointer itself, regardless of struct size"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After calling modifyByValue(s) where s.score starts at 50, what is s.score afterward?",
+   opts:["999","50 (unchanged)","0","Undefined"],ans:1,
+   exp:"<b>50, unchanged.</b> Pass-by-value gives the function a separate copy; modifying that copy has no effect on the caller's original struct."},
+  {type:"spot-the-bug",q:"What is the fundamental reason modifyByPointer's changes DO persist back to main?",
+   opts:["Pointers are magic","The pointer holds the actual memory address of the original struct, so writes through it modify that exact memory","Pointers are always faster","No real difference from pass-by-value"],ans:1,
+   exp:"<b>Same memory, not a copy.</b> The pointer parameter contains the ADDRESS of the original struct; dereferencing and writing through it modifies that exact location in memory, which is the same memory main's variable refers to."},
+  {type:"fill-in-the-blank",q:"Inside a function receiving <code>Rec *r</code>, you access a field with the ____ operator instead of a dot.",
+   answer:"arrow",exp:"The arrow operator (->) dereferences the pointer and accesses the field in one step."}
+ ]
+},
+{
+ id:"pq108", unit:"Unit 5", tab:"Q108 · Word frequency file",
+ title:"Word frequency report from a text file",
+ question:"Read a text file, produce a word frequency report using an array of structs {word,count}. Sort by frequency descending; write to a new file.",
+ aim:"Combine word-splitting (from earlier units), a struct array for counting, sorting, and file output into one pipeline.",
+ file:"q108.c",
+ syntax:[
+  {tok:"linear search for existing word", why:"Check before incrementing or adding",
+   body:"Before recording a new word occurrence, <code>findWord</code> checks if it's ALREADY in the frequency array — if so, increment its count; if not, add a new entry.",
+   trap:"Skipping this check would add a duplicate entry for every repeated word instead of incrementing a shared counter — completely defeating the purpose of frequency counting."},
+  {tok:"struct array {word, count} pairs", why:"Bundle each word with its running tally",
+   body:"Each <code>WordFreq</code> struct holds one distinct word and how many times it's been seen — the array as a whole IS the frequency table.",
+   trap:"Using two PARALLEL arrays (one for words, one for counts) instead of one struct array works but is more error-prone to keep synchronized."},
+  {tok:"selection sort by count, descending", why:"Rank words by frequency",
+   body:"Repeatedly finding the maximum remaining count and swapping it into position builds a descending-frequency ordered report — the same selection-sort pattern from Unit 3, applied to a different field.",
+   trap:"Sorting ascending instead of descending (or comparing the wrong field) would produce a report in the wrong or meaningless order."},
+  {tok:"dual output: printf AND fprintf", why:"Show on screen AND persist to file",
+   body:"Writing to both stdout (for immediate feedback) and a file (for later reference) in the same loop is a simple, common pattern — no need to loop twice.",
+   trap:"Forgetting to actually open/close the output file, or writing to only one destination when both are needed, misses half the requirement."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> word[<span class="num">50</span>]; <span class="ty">int</span> count; } WordFreq;',note:"Each struct bundles one word with its running count.",hl:true},
+  {t:'<span class="ty">int</span> <span class="fn">findWord</span>(<span class="ty">const char</span>*w){'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;wc;i++) <span class="kw">if</span>(<span class="fn">strcmp</span>(freq[i].word,w)==<span class="num">0</span>) <span class="kw">return</span> i;',note:"Check if this word is already tracked.",hl:true},
+  {t:'  <span class="kw">return</span> -<span class="num">1</span>;'},
+  {t:'}'},
+  {t:'<span class="cm">// In the parsing loop: increment existing, or add new</span>',hl:true},
+  {t:'<span class="ty">int</span> idx=<span class="fn">findWord</span>(word);'},
+  {t:'<span class="kw">if</span>(idx&gt;=<span class="num">0</span>) freq[idx].count++;',note:"Word seen before — just increment."},
+  {t:'<span class="kw">else</span> { <span class="fn">strcpy</span>(freq[wc].word,word); freq[wc].count=<span class="num">1</span>; wc++; }',note:"New word — add a fresh entry."},
+  {t:'<span class="cm">// Selection sort by count, descending (same pattern as Unit 3)</span>',hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;wc-<span class="num">1</span>;i++){ <span class="ty">int</span> maxIdx=i; <span class="kw">for</span>(<span class="ty">int</span> j=i+<span class="num">1</span>;j&lt;wc;j++) <span class="kw">if</span>(freq[j].count&gt;freq[maxIdx].count) maxIdx=j; ...swap... }'}
+ ],
+ mem:{
+  title:"Tallying \"the quick brown fox the lazy dog the fox runs\"",
+  vars:["word","findWord result","action"],
+  steps:[
+   {desc:"'the': not found (idx=-1) → new entry, count=1. wc=1",set:{word:"the","findWord result":"-1",action:"new entry (count=1)"},chg:["word","findWord result","action"]},
+   {desc:"'the' appears again: found at idx=0 → count becomes 2, then 3 (third occurrence)",set:{word:"the","findWord result":"0",action:"increment to 3"},chg:["word","findWord result","action"]},
+   {desc:"'fox' appears twice total → count=2. All others (quick,brown,lazy,dog,runs) appear once",set:{},chg:[]},
+   {desc:"After sorting descending: <span class='exec'>'the'(3) first, 'fox'(2) second</span>, rest tied at 1",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"the: 3"},{o:"fox: 2"},{o:"brown: 1"},{o:"quick: 1"},{o:"lazy: 1"},{o:"dog: 1"},{o:"runs: 1"}
+ ],
+ better:{
+  naive:"Linear search (findWord) for every word processed gives O(n²) total time for n words — fine for small texts, but slow for large documents with many distinct words.",
+  improvements:[
+   "<b>Use a hash table</b> instead of linear search for O(1) average-case word lookup, dramatically speeding up processing of large texts.",
+   "<b>Handle case-insensitivity</b> (e.g. 'The' and 'the' should probably count as the same word) if that matters for your use case — currently this is case-sensitive.",
+   "<b>Strip punctuation</b> attached to words (like 'fox.' vs 'fox') so trailing punctuation doesn't create spurious 'different' word entries."
+  ],
+  complexity:["Time: O(n × w) — n words processed, w average distinct words to search through (up to O(n²) worst case)","Sort: O(w²) for w distinct words with selection sort"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"In the sample text, which word appears most frequently?",
+   opts:["fox (2 times)","the (3 times)","dog (1 time)","quick (1 time)"],ans:1,
+   exp:"<b>'the' — 3 times.</b> It's the most frequent word in the sample sentence, correctly ranked first after descending sort."},
+  {type:"spot-the-bug",q:"What would happen if findWord's check were skipped, and every occurrence just added a new entry?",
+   opts:["No difference","Every word occurrence (even repeats) would create a SEPARATE entry with count=1, defeating the whole point of frequency counting","Faster processing","Words would be sorted automatically"],ans:1,
+   exp:"<b>No real counting.</b> Without checking for existing entries first, 'the' appearing 3 times would create THREE separate entries each with count=1, instead of one entry with count=3."},
+  {type:"fill-in-the-blank",q:"The report is sorted by count in ____ order (highest frequency first).",
+   answer:"descending",exp:"Descending order puts the most frequent words at the top of the report, which is the useful, expected presentation."}
+ ]
+},
+{
+ id:"pq109", unit:"Unit 5", tab:"Q109 · Min-tracking stack",
+ title:"A stack that tracks its minimum in O(1)",
+ question:"Each stack element stores both a value and the current minimum. Implement push, pop, getMin() in O(1). Why does this trade space for time?",
+ aim:"Store a 'running minimum so far' alongside every value, so getMin never needs to scan the stack.",
+ file:"q109.c",
+ syntax:[
+  {tok:"StackNode{value, minSoFar}", why:"Bundle each value with the min AT THAT POINT",
+   body:"Instead of storing just the value, each stack slot ALSO remembers what the minimum was across ALL elements up to and including that one — a small amount of extra bookkeeping per element.",
+   trap:"This is NOT the same as a single global minimum variable — each slot needs its OWN minSoFar, since popping must correctly restore the PREVIOUS minimum, not just the current smallest overall."},
+  {tok:"push computes minSoFar from the PREVIOUS top", why:"Incremental minimum tracking",
+   body:"When pushing a new value, its minSoFar is either the new value itself (if it's smaller) or the PREVIOUS top's minSoFar (if the new value isn't the new minimum) — O(1) work, no scanning needed.",
+   trap:"Forgetting the special case for an EMPTY stack (top==-1) when computing the first element's minSoFar would crash trying to read a nonexistent 'previous top'."},
+  {tok:"pop 'restores' the old minimum automatically", why:"The key payoff of this design",
+   body:"When you pop the top element, whatever minSoFar was stored in the NEW top (now exposed) is automatically the correct minimum for the remaining stack — no recomputation needed.",
+   trap:"This only works because minSoFar was correctly computed and stored AT PUSH TIME for every single element, not just the current top."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">int</span> value, minSoFar; } StackNode;',note:"Every stored element carries its own 'minimum up to here' snapshot.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">push</span>(<span class="ty">int</span> v){'},
+  {t:'  top++;'},
+  {t:'  stack[top].value=v;'},
+  {t:'  stack[top].minSoFar = (top==<span class="num">0</span>)? v : (v&lt;stack[top-<span class="num">1</span>].minSoFar? v : stack[top-<span class="num">1</span>].minSoFar);',note:"New min = smaller of (this value) and (previous element's stored min).",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">pop</span>(){ <span class="kw">return</span> stack[top--].value; }',note:"Simply popping automatically 'reveals' the correct prior minimum in the new top."},
+  {t:'<span class="ty">int</span> <span class="fn">getMin</span>(){ <span class="kw">return</span> stack[top].minSoFar; }',note:"O(1) — just read the current top's stored value, no scanning."}
+ ],
+ mem:{
+  title:"Pushing 5,2,8,1 then popping twice",
+  vars:["stack top value","stack top minSoFar"],
+  steps:[
+   {desc:"push(5): top=0. minSoFar = 5 (first element, no previous to compare)",set:{"stack top value":"5","stack top minSoFar":"5"},chg:["stack top value","stack top minSoFar"]},
+   {desc:"push(2): top=1. 2 < previous min(5) → minSoFar=2",set:{"stack top value":"2","stack top minSoFar":"2"},chg:["stack top value","stack top minSoFar"]},
+   {desc:"push(8): top=2. 8 &gt; previous min(2) → minSoFar stays 2",set:{"stack top value":"8","stack top minSoFar":"2"},chg:["stack top value","stack top minSoFar"]},
+   {desc:"push(1): top=3. 1 &lt; previous min(2) → minSoFar=1",set:{"stack top value":"1","stack top minSoFar":"1"},chg:["stack top value","stack top minSoFar"]},
+   {desc:"pop() removes 1. New top is the '8' entry, whose STORED minSoFar was 2. <span class='exec'>getMin() correctly returns 2</span> — no recomputation needed!",set:{"stack top value":"8","stack top minSoFar":"2"},chg:["stack top value","stack top minSoFar"]}
+  ]
+ },
+ output:[
+  {o:"push 5, min=5"},{o:"push 2, min=2"},{o:"push 8, min=2"},{o:"push 1, min=1"},
+  {o:"pop, min=2"},{o:"pop, min=2"}
+ ],
+ better:{
+  naive:"A naive getMin() that scans the entire stack every call would be O(n) per query — fine occasionally, but expensive if called very frequently, which is exactly what this design optimizes away.",
+  improvements:[
+   "<b>This design IS the optimal solution</b> for O(1) getMin — the space tradeoff (doubling storage per element) is a deliberate, worthwhile cost for the time savings.",
+   "<b>An alternative using a separate auxiliary min-stack</b> (pushing/popping the min in parallel, only when it changes) can save some space compared to storing minSoFar with EVERY element, at the cost of slightly more complex logic.",
+   "<b>This exact pattern</b> (or its auxiliary-stack variant) is a classic interview question, precisely because it teaches the general principle of trading space for time via precomputation."
+  ],
+  complexity:["push/pop/getMin: all O(1) time","Space: O(n) — but with double the per-element storage compared to a plain stack"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After pushing 5,2,8,1 (in that order) and then popping once, what does getMin() return?",
+   opts:["1","2","5","8"],ans:1,
+   exp:"<b>2.</b> Popping removes the 1. The new top (the '8' entry) has minSoFar=2, stored back when it was pushed — correctly reflecting the minimum of the remaining {5,2,8}."},
+  {type:"spot-the-bug",q:"Why must EVERY stack element store its own minSoFar, rather than just tracking one global 'current minimum' variable?",
+   opts:["No real reason, one global variable would work fine","Popping needs to correctly restore the PREVIOUS minimum, which a single global variable can't do without re-scanning","Faster with per-element storage","Required by C syntax"],ans:1,
+   exp:"<b>Pop needs history.</b> When you pop an element that happened to be the current minimum, a single global variable couldn't know what the SECOND-smallest remaining value is without rescanning — but each element's OWN stored minSoFar already has that answer ready."},
+  {type:"fill-in-the-blank",q:"This design achieves O(1) getMin by trading extra ____ for that speed.",
+   answer:"space",exp:"Storing an additional minSoFar value alongside every element doubles the per-element storage cost, in exchange for O(1) minimum queries."}
+ ]
+},
+{
+ id:"pq110", unit:"Unit 5", tab:"Q110 · fopen NULL check",
+ title:"Why fopen can return NULL — and how to handle it",
+ question:"A program never checks if fopen's result is NULL. List five real scenarios where this happens. Redesign with exhaustive error handling.",
+ aim:"Enumerate realistic failure modes and always guard file operations with a NULL check before use.",
+ file:"q110.c",
+ syntax:[
+  {tok:"fopen returns NULL on failure", why:"The universal failure signal",
+   body:"Regardless of WHY opening failed, fopen consistently returns a NULL pointer — checking for this ONE condition catches all failure modes uniformly.",
+   trap:"Assuming fopen 'always succeeds' for files you expect to exist is a common but dangerous assumption — file systems, permissions, and resources can all fail unexpectedly."},
+  {tok:"errno + strerror for diagnostic detail", why:"WHY did it fail, not just THAT it failed",
+   body:"After a failed fopen, the global <code>errno</code> variable holds a specific error code, and <code>strerror(errno)</code> converts that into a human-readable message — useful for logging or displaying to a user.",
+   trap:"errno's value is only meaningful IMMEDIATELY after the failing call — any subsequent library call could overwrite it before you check."},
+  {tok:"the five scenarios themselves", why:"Concrete, realistic failure modes",
+   body:"Missing file, permission denied, invalid path (nonexistent directory), too many open file descriptors, and disk full/no space are all REAL, common reasons fopen fails in practice — not just theoretical edge cases.",
+   trap:"Assuming only 'file doesn't exist' can cause failure misses several other equally real and common scenarios that experienced C programmers guard against."}
+ ],
+ code:[
+  {t:'FILE *fp = <span class="fn">fopen</span>(<span class="str">"/nonexistent/path/file.txt"</span>,<span class="str">"r"</span>);'},
+  {t:'<span class="kw">if</span>(fp==NULL){',note:"ALWAYS check the return value before using fp for anything.",hl:true},
+  {t:'  <span class="fn">printf</span>(<span class="str">"fopen returned NULL. errno=%d (%s)\\n"</span>, errno, <span class="fn">strerror</span>(errno));',note:"errno + strerror give a specific, human-readable reason.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Five real scenarios where fopen returns NULL:</span>',hl:true},
+  {t:'<span class="cm">// 1. File doesn\'t exist (mode \'r\')</span>'},
+  {t:'<span class="cm">// 2. No permission to access the file/directory</span>'},
+  {t:'<span class="cm">// 3. Path includes a directory that doesn\'t exist</span>'},
+  {t:'<span class="cm">// 4. Too many files already open (system fd limit reached)</span>'},
+  {t:'<span class="cm">// 5. Disk full / no space, when opening for write</span>'}
+ ],
+ mem:{
+  title:"Attempting to open a nonexistent path",
+  vars:["fopen result","errno","strerror(errno)"],
+  steps:[
+   {desc:"fopen('/nonexistent/path/file.txt','r') attempts to open a path that doesn't exist",set:{},chg:[]},
+   {desc:"Since the file/directory doesn't exist, fopen returns <span class='exec'>NULL</span>",set:{"fopen result":"NULL"},chg:["fopen result"]},
+   {desc:"errno is set to 2 (ENOENT — 'No such file or directory')",set:{errno:"2","strerror(errno)":"No such file or directory"},chg:["errno","strerror(errno)"]}
+  ]
+ },
+ output:[
+  {o:"fopen returned NULL. errno=2 (No such file or directory)"},
+  {o:""},
+  {o:"Five scenarios where fopen returns NULL:"},
+  {o:"1. File doesn't exist (mode 'r')"},
+  {o:"2. No permission to access the file/directory"},
+  {o:"3. Path includes a directory that doesn't exist"},
+  {o:"4. Too many files already open (system fd limit reached)"},
+  {o:"5. Disk full / no space, when opening for write"}
+ ],
+ better:{
+  naive:"Skipping the NULL check entirely and immediately using fp (e.g. calling fread/fwrite on it) is undefined behavior — often a crash, but not guaranteed to fail predictably or immediately.",
+  improvements:[
+   "<b>Always check for NULL</b> immediately after every fopen call, before any other use of the file pointer — this is non-negotiable defensive practice in production C code.",
+   "<b>Use errno and strerror</b> to provide specific, actionable error messages rather than a generic 'file error' — helps users and developers diagnose the actual problem faster.",
+   "<b>Design for graceful degradation</b>: decide explicitly what your program should do when a file operation fails (retry? use a default? exit cleanly?) rather than letting undefined behavior decide for you."
+  ],
+  complexity:["Time: O(1) for the check itself","This is a correctness/robustness practice, not a performance consideration"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What does fopen return if the requested file simply doesn't exist (mode 'r')?",
+   opts:["An empty file handle","NULL","A valid but empty FILE*","Program crashes immediately"],ans:1,
+   exp:"<b>NULL.</b> Any fopen failure — regardless of the specific cause — is signaled uniformly by returning NULL; the calling code must check for this."},
+  {type:"spot-the-bug",q:"What happens if a program uses fp (e.g. calls fread on it) without checking for NULL first, after a failed fopen?",
+   opts:["Nothing bad, C handles it gracefully","Undefined behavior — often a crash, but not guaranteed to fail predictably","Compiler catches it automatically","Returns a default value"],ans:1,
+   exp:"<b>Undefined behavior.</b> Dereferencing or using a NULL FILE* pointer in fread/fwrite/fclose is UB — commonly a segmentation fault, but the exact behavior isn't guaranteed by the standard."},
+  {type:"fill-in-the-blank",q:"After a failed fopen, the global variable ____ holds a specific error code explaining why.",
+   answer:"errno",exp:"errno (paired with strerror() to get a readable message) provides diagnostic detail beyond just knowing that the call failed."}
+ ]
+}
+];
+PRACTICE_U5.push(
+{
+ id:"pq111", unit:"Unit 5", tab:"Q111 · Date arithmetic",
+ title:"A date structure with arithmetic and leap year handling",
+ question:"Struct for a date (day,month,year). Compute days between two dates, day of week, and add n days — handling leap years correctly.",
+ aim:"Convert dates to a comparable 'day number', enabling arithmetic while respecting variable month lengths and leap years.",
+ file:"q111.c",
+ syntax:[
+  {tok:"isLeap: the three-part rule", why:"Divisible by 4, except centuries, except-except multiples of 400",
+   body:"The same leap year rule from Q32 reused here — divisible by 4 AND not by 100, OR divisible by 400. Century years like 1900 are NOT leap, but 2000 IS.",
+   trap:"Getting any part of this three-way rule wrong makes February have the wrong length in leap vs. non-leap years, throwing off all subsequent date arithmetic."},
+  {tok:"daysInMonth checks February specially", why:"The only month with a variable length",
+   body:"Every month except February has a FIXED length; only February's length (28 or 29) depends on whether the year is a leap year — checked via <code>isLeap</code>.",
+   trap:"Hardcoding February as always 28 (or always 29) breaks date arithmetic that crosses a leap/non-leap February."},
+  {tok:"addDays: carry over month/year boundaries", why:"Adding days can overflow into the next month or year",
+   body:"After adding n days to the day-of-month field, a while loop checks if the day count now EXCEEDS that month's length, and if so, subtracts the month's length and advances to the next month (carrying into the next year if needed).",
+   trap:"A single 'if' instead of a 'while' loop would only handle carrying ONE month forward — adding many days (e.g. 60) might need multiple carries."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">isLeap</span>(<span class="ty">int</span> y){ <span class="kw">return</span> (y%<span class="num">4</span>==<span class="num">0</span> &amp;&amp; y%<span class="num">100</span>!=<span class="num">0</span>) || (y%<span class="num">400</span>==<span class="num">0</span>); }',note:"The same 3-part rule from Q32.",hl:true},
+  {t:'<span class="ty">int</span> <span class="fn">daysInMonth</span>(<span class="ty">int</span> m,<span class="ty">int</span> y){'},
+  {t:'  <span class="ty">int</span> d[]={<span class="num">31</span>,<span class="num">28</span>,<span class="num">31</span>,<span class="num">30</span>,<span class="num">31</span>,<span class="num">30</span>,<span class="num">31</span>,<span class="num">31</span>,<span class="num">30</span>,<span class="num">31</span>,<span class="num">30</span>,<span class="num">31</span>};'},
+  {t:'  <span class="kw">if</span>(m==<span class="num">2</span> &amp;&amp; <span class="fn">isLeap</span>(y)) <span class="kw">return</span> <span class="num">29</span>;',note:"Only February varies — check leap year specifically.",hl:true},
+  {t:'  <span class="kw">return</span> d[m-<span class="num">1</span>];'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">addDays</span>(Date*d,<span class="ty">int</span> n){'},
+  {t:'  d->day+=n;'},
+  {t:'  <span class="kw">while</span>(d->day&gt;<span class="fn">daysInMonth</span>(d->month,d->year)){',note:"WHILE (not if) — may need to carry across multiple month boundaries.",hl:true},
+  {t:'    d->day-=<span class="fn">daysInMonth</span>(d->month,d->year);'},
+  {t:'    d->month++; <span class="kw">if</span>(d->month&gt;<span class="num">12</span>){ d->month=<span class="num">1</span>; d->year++; }',note:"Carry into next year if month overflows past December."},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Adding 2 days to Feb 28, 2024 (a leap year!)",
+  vars:["d.day","d.month","d.year","daysInMonth(2,2024)"],
+  steps:[
+   {desc:"Start: Feb 28, 2024. daysInMonth(2,2024) = 29 (LEAP year, so Feb has 29 days)",set:{"d.day":"28","d.month":"2","d.year":"2024","daysInMonth(2,2024)":"29"},chg:["d.day","d.month","d.year","daysInMonth(2,2024)"]},
+   {desc:"d.day += 2 → 30. Check: 30 > 29(Feb's length) → carry!",set:{"d.day":"30"},chg:["d.day"]},
+   {desc:"d.day -= 29 → 1. d.month++ → 3 (March)",set:{"d.day":"1","d.month":"3"},chg:["d.day","d.month"]},
+   {desc:"Check again: 1 > 31(March's length)? No. <span class='exec'>Final: March 1, 2024</span> — correctly used Feb's 29 days since it's a leap year!",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Days between Jan 1 2024 and Mar 15 2024: 74"},
+  {o:"Feb 28 2024 + 2 days = 1/3/2024 (leap year handled)"}
+ ],
+ better:{
+  naive:"This day-counting approach works but the 'toDayNumber' formula used for daysBetween is a simplified approximation — production date libraries use more rigorous calendar algorithms (like the Julian Day Number system).",
+  improvements:[
+   "<b>For production-quality date arithmetic</b>, use a well-tested library (like the C standard's <code>&lt;time.h&gt;</code> with <code>mktime</code>/<code>difftime</code>, or a dedicated date library) rather than hand-rolling day-counting formulas — subtle calendar edge cases are easy to get wrong.",
+   "<b>Day-of-week calculation</b> (mentioned in the question but not shown here) typically uses Zeller's congruence or a similar formula — a good extension exercise.",
+   "<b>Validate input dates</b> (e.g. reject day=32 or month=13) before performing any arithmetic on them."
+  ],
+  complexity:["Time: O(months) for daysBetween/addDays in the worst case (could span many months)","Space: O(1)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is Feb 28, 2024 + 2 days, given that 2024 is a leap year?",
+   opts:["March 2, 2024","March 1, 2024","Feb 30, 2024 (invalid)","March 3, 2024"],ans:1,
+   exp:"<b>March 1, 2024.</b> Since 2024 is a leap year, February has 29 days: Feb 28 + 1 = Feb 29 (valid!), + 1 more = March 1."},
+  {type:"spot-the-bug",q:"What would go wrong if daysInMonth always returned 28 for February, ignoring leap years?",
+   opts:["No difference","Date arithmetic crossing a leap year's February would be off by one day","Only affects the year 2024","Faster computation"],ans:1,
+   exp:"<b>Off-by-one errors.</b> Ignoring leap years means any date calculation spanning a leap February would undercount by exactly one day, silently producing wrong results."},
+  {type:"fill-in-the-blank",q:"The addDays function uses a ____ loop (not a single if) to correctly handle carrying across multiple month boundaries.",
+   answer:"while",exp:"A while loop can carry repeatedly if needed (e.g., adding 400 days might cross more than one month/year boundary), which a single if-check cannot handle."}
+ ]
+},
+{
+ id:"pq112", unit:"Unit 5", tab:"Q112 · Log file system",
+ title:"A timestamped log file with keyword search",
+ question:"Write timestamped log entries in append mode. Add a function to search the log for a keyword and extract matches to a separate file.",
+ aim:"Append-only logging keeps history intact, and a filtering pass copies only matching lines to a new file.",
+ file:"q112.c",
+ syntax:[
+  {tok:"fopen(...,\"a\") for every log write", why:"Append mode preserves all history",
+   body:"Opening in append mode each time a new message is logged ensures every PREVIOUS entry stays in the file — new entries always go at the end, never overwriting history.",
+   trap:"Using 'w' instead of 'a' (the classic Q116 mistake) would erase the entire log every time a new message is written."},
+  {tok:"strstr for keyword matching", why:"Substring search within each line",
+   body:"<code>strstr(line, keyword)</code> returns a non-NULL pointer if <code>keyword</code> appears ANYWHERE within <code>line</code> — a simple, effective way to filter log entries containing a search term.",
+   trap:"strstr does a literal substring match — it won't handle case-insensitive search, regex patterns, or word-boundary matching without additional logic."},
+  {tok:"fgets + fputs streaming filter", why:"Process one line at a time without loading the whole file",
+   body:"Reading with <code>fgets</code> and conditionally writing matching lines with <code>fputs</code> processes the log FILE-BY-LINE, which scales well even for large log files that wouldn't fit comfortably in memory all at once.",
+   trap:"fgets keeps the trailing newline in the buffer — fputs preserves it correctly when writing back out, so lines in the filtered file retain their original formatting."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">logMessage</span>(<span class="ty">const char</span>*msg){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(<span class="str">"app.log"</span>,<span class="str">"a"</span>);',note:"Append mode — never erases previous log entries.",hl:true},
+  {t:'  <span class="fn">fprintf</span>(fp,<span class="str">"[%s] %s\\n"</span>, timestamp, msg);'},
+  {t:'  <span class="fn">fclose</span>(fp);'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">searchLog</span>(<span class="ty">const char</span>*keyword){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(<span class="str">"app.log"</span>,<span class="str">"r"</span>); FILE*out=<span class="fn">fopen</span>(<span class="str">"filtered.log"</span>,<span class="str">"w"</span>);'},
+  {t:'  <span class="ty">char</span> line[<span class="num">256</span>];'},
+  {t:'  <span class="kw">while</span>(<span class="fn">fgets</span>(line,<span class="kw">sizeof</span>(line),fp)){',note:"Process one line at a time — scales to large log files.",hl:true},
+  {t:'    <span class="kw">if</span>(<span class="fn">strstr</span>(line,keyword)){ <span class="fn">fputs</span>(line,out); found++; }',note:"Copy this line to the filtered output if it contains the keyword.",hl:true},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Filtering for 'login' among 4 log entries",
+  vars:["line","contains 'login'?","filtered.log"],
+  steps:[
+   {desc:"Line: 'Server started' → strstr finds no match",set:{line:"Server started","contains 'login'?":"no"},chg:["line","contains 'login'?"]},
+   {desc:"Line: 'User login: alice' → MATCH → written to filtered.log",set:{line:"User login: alice","contains 'login'?":"yes","filtered.log":"+alice line"},chg:["line","contains 'login'?","filtered.log"]},
+   {desc:"Line: 'ERROR: disk full' → no match",set:{line:"ERROR: disk full","contains 'login'?":"no"},chg:["line","contains 'login'?"]},
+   {desc:"Line: 'User login: bob' → <span class='exec'>MATCH</span> → written to filtered.log",set:{line:"User login: bob","contains 'login'?":"yes","filtered.log":"+alice,+bob lines"},chg:["line","contains 'login'?","filtered.log"]}
+  ]
+ },
+ output:[
+  {o:"Found 2 matching entries, written to filtered.log"},
+  {o:"Filtered contents:"},
+  {o:"[2026-01-15 10:30:00] User login: alice"},
+  {o:"[2026-01-15 10:30:00] User login: bob"}
+ ],
+ better:{
+  naive:"strstr's exact substring match doesn't support case-insensitivity or more sophisticated pattern matching — fine for simple keyword search, limited for complex log analysis needs.",
+  improvements:[
+   "<b>Case-insensitive search</b> would require lowercasing both the line and keyword before comparison (or using a case-insensitive variant like strcasestr where available).",
+   "<b>For very large log files</b>, consider log rotation (splitting into dated files) to keep any single file's size manageable.",
+   "<b>Real timestamps</b> (using actual <code>time()</code> and formatting functions, rather than the fixed demo timestamp shown here) would give genuinely useful chronological logs."
+  ],
+  complexity:["Time: O(n) for logging (single append), O(n×m) for search (n lines, each checked against keyword of length m)","Space: O(1) — processes line by line, doesn't load entire file into memory"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why must logMessage use 'a' (append) mode instead of 'w' (write/truncate)?",
+   opts:["No difference","'w' would erase all previous log entries every time a new message is logged","'a' is faster","'w' is deprecated"],ans:1,
+   exp:"<b>Preserves history.</b> Using 'w' would truncate the file on each call, destroying all previously logged messages — 'a' is essential for maintaining a persistent, growing log."},
+  {type:"spot-the-bug",q:"What does strstr(line, \"login\") return if the keyword ISN'T found in that line?",
+   opts:["An empty string","NULL","-1","0"],ans:1,
+   exp:"<b>NULL.</b> strstr returns NULL when the substring isn't found, and a pointer to the first occurrence when it is — used directly as a truthy/falsy condition in the if-check."},
+  {type:"fill-in-the-blank",q:"Reading the log file line-by-line with fgets (rather than loading it all at once) keeps memory usage at O(____) regardless of file size.",
+   answer:"1",exp:"Since only one line's worth of data is held in memory at a time, this streaming approach scales to arbitrarily large log files without memory concerns."}
+ ]
+},
+{
+ id:"pq113", unit:"Unit 5", tab:"Q113 · Struct padding",
+ title:"Struct field ordering and memory padding",
+ question:"A struct has char, int, double fields in that order. What is sizeof(struct)? Rearrange fields to minimize padding, and verify empirically.",
+ aim:"See how field ORDER (not just field sizes) affects a struct's total memory footprint due to alignment requirements.",
+ file:"q113.c",
+ syntax:[
+  {tok:"alignment requirements per type", why:"Each type must start at an address that's a multiple of its size",
+   body:"A <code>double</code> (8 bytes) typically must start at an address divisible by 8; an <code>int</code> (4 bytes) at an address divisible by 4. The compiler inserts invisible PADDING bytes to satisfy these constraints.",
+   trap:"Padding is completely invisible in your source code — you only see its effects through <code>sizeof</code>, never as an explicit field."},
+  {tok:"interleaved small/large fields waste more padding", why:"Every large-field boundary may need padding on both sides",
+   body:"Placing a large field (like double) between two small fields (like char) can force padding both BEFORE and around the large field to satisfy its alignment, multiplying the wasted space.",
+   trap:"Intuition might suggest padding only depends on total field sizes — but ORDER matters just as much, sometimes more, for the final struct size."},
+  {tok:"reordering largest-to-smallest minimizes padding", why:"A general rule of thumb",
+   body:"Placing fields from largest alignment requirement to smallest (typically: doubles, then ints, then chars) tends to minimize the total padding needed, since smaller fields can often 'fill in' the gaps after larger ones.",
+   trap:"This is a heuristic, not an absolute guarantee for every possible field combination — but it works well in the vast majority of practical cases."}
+ ],
+ code:[
+  {t:'<span class="kw">struct</span> Unordered { <span class="ty">char</span> c1; <span class="ty">double</span> d; <span class="ty">char</span> c2; <span class="ty">int</span> i; };',note:"Small fields interleaved with large ones — forces extra padding around each transition.",hl:true},
+  {t:'<span class="kw">struct</span> Ordered   { <span class="ty">double</span> d; <span class="ty">int</span> i; <span class="ty">char</span> c1; <span class="ty">char</span> c2; };',note:"Largest to smallest — minimizes padding by grouping small fields together at the end.",hl:true},
+  {t:'<span class="fn">printf</span>(<span class="str">"sizeof(Unordered) = %zu bytes\\n"</span>, <span class="kw">sizeof</span>(<span class="kw">struct</span> Unordered));',hl:true},
+  {t:'<span class="fn">printf</span>(<span class="str">"sizeof(Ordered)   = %zu bytes\\n"</span>, <span class="kw">sizeof</span>(<span class="kw">struct</span> Ordered));',hl:true}
+ ],
+ mem:{
+  title:"Comparing memory layout: same 4 fields, different order",
+  vars:["field order","real data bytes","padding bytes","total sizeof"],
+  steps:[
+   {desc:"Unordered {char,double,char,int}: real data = 1+8+1+4 = 14 bytes",set:{"field order":"char,double,char,int","real data bytes":"14"},chg:["field order","real data bytes"]},
+   {desc:"Padding needed around the double (must be 8-byte aligned) forces gaps → total <span class='exec'>24 bytes</span> (10 bytes of padding!)",set:{"padding bytes":"10","total sizeof":"24"},chg:["padding bytes","total sizeof"]},
+   {desc:"Ordered {double,int,char,char}: same 14 real bytes, but grouping small fields together at the end",set:{"field order":"double,int,char,char"},chg:["field order"]},
+   {desc:"Much less padding needed → total <span class='exec'>16 bytes</span> (only 2 bytes of padding — a 33% memory savings!)",set:{"padding bytes":"2","total sizeof":"16"},chg:["padding bytes","total sizeof"]}
+  ]
+ },
+ output:[
+  {o:"sizeof(struct Unordered) [char,double,char,int] = 24 bytes"},
+  {o:"sizeof(struct Ordered)   [double,int,char,char] = 16 bytes"},
+  {o:"Same 4 fields (1+8+1+4=14 bytes of real data), but ordering changes total padding."}
+ ],
+ better:{
+  naive:"Declaring struct fields in 'logical' or 'alphabetical' order without considering alignment can waste significant memory, especially in arrays of many struct instances.",
+  improvements:[
+   "<b>Order fields from largest alignment requirement to smallest</b> (typically doubles/pointers, then ints, then shorts, then chars) as a general-purpose memory optimization.",
+   "<b>This matters most for arrays of structs</b> — a 33% size reduction per struct compounds significantly when you have thousands or millions of instances.",
+   "<b>Some compilers support <code>#pragma pack</code></b> to force tighter packing (no padding at all), but this can hurt performance (misaligned access penalties) and isn't portable — use with caution and only when memory is truly the bottleneck."
+  ],
+  complexity:["This is a memory-layout optimization, not a time-complexity one","Space savings: up to ~33% in this specific example, varies by field combination"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Do both struct versions (Unordered and Ordered) contain the same actual DATA (same fields, same types)?",
+   opts:["No, different fields","Yes — identical fields, just declared in a different order","Ordered has fewer fields","Unordered has fewer fields"],ans:1,
+   exp:"<b>Yes, identical data.</b> Both structs have exactly the same 4 fields (char,double,char,int total) — only the DECLARATION ORDER differs, yet that alone changes the total size from 24 to 16 bytes."},
+  {type:"spot-the-bug",q:"Why does interleaving small fields (char) between large ones (double) waste more memory than grouping them together?",
+   opts:["No real difference","Alignment requirements force padding around EACH large-field boundary; grouping small fields together needs padding only once","Always uses exactly the same memory","Only matters for arrays"],ans:1,
+   exp:"<b>Repeated padding overhead.</b> Every time a small field is followed by a large one needing stricter alignment, padding may be inserted — interleaving multiplies these boundary crossings, while grouping similar-sized fields minimizes them."},
+  {type:"fill-in-the-blank",q:"A general rule of thumb for minimizing struct padding is to order fields from ____ to smallest.",
+   answer:"largest",exp:"Ordering by decreasing size (or alignment requirement) tends to minimize the total padding the compiler needs to insert."}
+ ]
+}
+);
+/* ===== PRACTICE QUESTIONS — UNIT 5 (Q114–125) ===== */
+const PRACTICE_U5B = [
+{
+ id:"pq114", unit:"Unit 5", tab:"Q114 · Voting machine",
+ title:"A voting machine with invalid-vote detection",
+ question:"Candidates stored in an array of structs. Votes read from a file (one name per line). Tally, detect invalid names, report with percentages.",
+ aim:"Match each vote against known candidates, silently rejecting anything that doesn't match, then compute percentages of valid votes only.",
+ file:"q114.c",
+ syntax:[
+  {tok:"findCandidate as the validation gate", why:"Unknown names are rejected, not tallied",
+   body:"Every incoming 'vote' is looked up against the candidates array; if no match is found (returns -1), it's counted as invalid rather than silently ignored or crashing.",
+   trap:"Not checking for -1 before using the index would either crash (accessing candidates[-1]) or, worse, silently corrupt an unrelated candidate's tally."},
+  {tok:"percentages computed against VALID votes only", why:"Invalid votes shouldn't skew the reported percentages",
+   body:"The percentage calculation divides by <code>totalValid</code> (not the total number of lines read), so a stray invalid entry doesn't distort the reported results for legitimate candidates.",
+   trap:"Dividing by the TOTAL line count (including invalid entries) would make percentages not sum to 100% among the valid candidates, which is misleading."},
+  {tok:"reporting BOTH tallies and invalid count", why:"Transparency about data quality",
+   body:"Explicitly reporting how many votes were rejected (not just silently dropping them) gives visibility into potential data entry problems or fraud attempts.",
+   trap:"Silently discarding invalid votes without reporting the count hides potentially important information about the vote file's integrity."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">findCandidate</span>(<span class="ty">const char</span>*n){ <span class="kw">for</span>(...) <span class="kw">if</span>(<span class="fn">strcmp</span>(candidates[i].name,n)==<span class="num">0</span>) <span class="kw">return</span> i; <span class="kw">return</span> -<span class="num">1</span>; }',note:"Returns -1 for any name not matching a known candidate.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;<span class="num">7</span>;i++){'},
+  {t:'  <span class="ty">int</span> idx=<span class="fn">findCandidate</span>(votes[i]);'},
+  {t:'  <span class="kw">if</span>(idx==-<span class="num">1</span>){ invalid++; ...report invalid...; <span class="kw">continue</span>; }',note:"Explicitly reject and count invalid votes, don't tally them.",hl:true},
+  {t:'  candidates[idx].votes++; totalValid++;'},
+  {t:'}'},
+  {t:'<span class="cm">// Percentage uses totalValid, NOT the raw line count (which includes invalid entries)</span>',hl:true},
+  {t:'<span class="fn">printf</span>(<span class="str">"%.1f%%"</span>, <span class="num">100.0</span>*candidates[i].votes/totalValid);'}
+ ],
+ mem:{
+  title:"Tallying 7 votes with 1 invalid name",
+  vars:["vote","found?","tally","invalid count"],
+  steps:[
+   {desc:"'Alice' found → candidates[0].votes++ → 1. totalValid=1",set:{vote:"Alice","found?":"yes",tally:"Alice:1"},chg:["vote","found?","tally"]},
+   {desc:"...continuing through valid votes: Bob, Alice again, Carol, Alice again...",set:{tally:"Alice:3, Bob:1, Carol:1"},chg:["tally"]},
+   {desc:"'InvalidName' → findCandidate returns -1 → <span class='exec'>rejected, invalid++</span>",set:{vote:"InvalidName","found?":"no (-1)","invalid count":"1"},chg:["vote","found?","invalid count"]},
+   {desc:"Final: Bob gets one more vote. totalValid=6 (not 7 — the invalid one is excluded from the denominator)",set:{tally:"Alice:3, Bob:2, Carol:1"},chg:["tally"]}
+  ]
+ },
+ output:[
+  {o:"Invalid vote: InvalidName"},
+  {o:"Alice: 3 votes (50.0%)"},
+  {o:"Bob: 2 votes (33.3%)"},
+  {o:"Carol: 1 votes (16.7%)"},
+  {o:"Invalid votes discarded: 1"}
+ ],
+ better:{
+  naive:"Simple exact-string matching for candidate names is fragile — case differences, extra whitespace, or typos would all be rejected as 'invalid' even if clearly intended for a real candidate.",
+  improvements:[
+   "<b>Case-insensitive and whitespace-trimmed matching</b> would reduce false rejections from minor formatting differences in the vote file.",
+   "<b>Fuzzy matching</b> (e.g. edit distance) could flag likely-typo votes for human review rather than outright rejection, though this adds complexity and potential for misuse.",
+   "<b>Audit logging</b> of exactly which invalid strings were seen (not just a count) would help diagnose whether rejections are genuine fraud attempts or simple data entry errors."
+  ],
+  complexity:["Time: O(votes × candidates) — each vote does a linear scan","Space: O(candidates)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"If 'InvalidName' were counted in the percentage denominator too, would Alice's reported percentage change?",
+   opts:["No difference","Yes — the percentage would be diluted by including a vote that didn't go to any real candidate","Only Bob's would change","Only Carol's would change"],ans:1,
+   exp:"<b>Yes, it would change.</b> Including the invalid vote in the denominator (7 total instead of 6 valid) would make all percentages sum to less than 100%, misleadingly diluting each candidate's true share."},
+  {type:"spot-the-bug",q:"What must happen before using findCandidate's return value as an array index?",
+   opts:["Nothing, it's always safe","Check if it's -1 (not found) before indexing into candidates[]","Convert to unsigned","Multiply by 2"],ans:1,
+   exp:"<b>Check for -1 first.</b> Using -1 directly as an array index would either crash or access unrelated memory — the explicit check routes invalid names to the rejection path instead."},
+  {type:"fill-in-the-blank",q:"Percentages should be calculated against the count of ____ votes, not the total number of lines read from the file.",
+   answer:"valid",exp:"Excluding invalid votes from the denominator ensures the reported percentages accurately reflect the distribution among real candidates."}
+ ]
+},
+{
+ id:"pq115", unit:"Unit 5", tab:"Q115 · Comparator sorting",
+ title:"Sorting employee records with pluggable comparators",
+ question:"A function takes an array of employee structs and a comparator function pointer. Use it to sort by salary, name, or department without rewriting the sort logic.",
+ aim:"Separate the sorting ALGORITHM (handled once by qsort) from the sorting CRITERIA (swappable via function pointers).",
+ file:"q115.c",
+ syntax:[
+  {tok:"int cmpSalary(const void*a, const void*b)", why:"qsort's required comparator signature",
+   body:"qsort demands comparator functions with EXACTLY this signature (two <code>const void*</code> parameters, returning int) — the void pointers must be cast back to the real type inside the function.",
+   trap:"Forgetting to cast <code>(Employee*)a</code> before accessing fields would be a compile error, since void* can't be dereferenced directly."},
+  {tok:"one sortEmployees function, many comparators", why:"Reuse the same sorting call with different behavior",
+   body:"<code>sortEmployees</code> just forwards to qsort with whatever comparator function pointer it's given — the SAME function call sorts by salary, name, or any other criteria, depending only on which comparator is passed in.",
+   trap:"Writing separate sort functions for each criteria (sortBySalary, sortByName, etc.) would duplicate the actual sorting logic three times — the whole point of this design is to avoid that."},
+  {tok:"return value convention: negative/zero/positive", why:"How qsort interprets comparator results",
+   body:"A comparator returning negative means 'a comes before b', positive means 'a comes after b', zero means 'equal' — qsort uses these signals to determine the correct order.",
+   trap:"For floating-point comparisons (like salary), simply returning <code>a-b</code> can lose precision or behave oddly near zero — using an explicit sign-extraction (as shown) is safer."}
+ ],
+ code:[
+  {t:'<span class="ty">int</span> <span class="fn">cmpSalary</span>(<span class="ty">const void</span>*a,<span class="ty">const void</span>*b){'},
+  {t:'  <span class="ty">float</span> diff = ((Employee*)a)->salary - ((Employee*)b)->salary;',note:"Cast void* back to Employee* to access the salary field.",hl:true},
+  {t:'  <span class="kw">return</span> (diff&gt;<span class="num">0</span>)-(diff&lt;<span class="num">0</span>);',note:"Safely extract the sign: +1, 0, or -1 — avoids float-to-int truncation issues."},
+  {t:'}'},
+  {t:'<span class="ty">int</span> <span class="fn">cmpName</span>(<span class="ty">const void</span>*a,<span class="ty">const void</span>*b){ <span class="kw">return</span> <span class="fn">strcmp</span>(((Employee*)a)->name, ((Employee*)b)->name); }'},
+  {t:'<span class="ty">void</span> <span class="fn">sortEmployees</span>(Employee arr[], <span class="ty">int</span> n, <span class="ty">int</span> (*cmp)(<span class="ty">const void</span>*,<span class="ty">const void</span>*)){'},
+  {t:'  <span class="fn">qsort</span>(arr, n, <span class="kw">sizeof</span>(Employee), cmp);',note:"SAME sort call, criteria determined entirely by which comparator is passed.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Sorting the same array two different ways",
+  vars:["comparator used","resulting order"],
+  steps:[
+   {desc:"sortEmployees(emps,3,cmpSalary) — sorts ascending by salary",set:{"comparator used":"cmpSalary","resulting order":"Charlie(55k), Bob(61k), Alice(72k)"},chg:["comparator used","resulting order"]},
+   {desc:"sortEmployees(emps,3,cmpName) — SAME function call, different comparator — sorts alphabetically instead",set:{"comparator used":"cmpName","resulting order":"Alice, Bob, Charlie"},chg:["comparator used","resulting order"]},
+   {desc:"<span class='exec'>The sorting algorithm itself never changed</span> — only the comparison rule did",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"Sorted by salary: Charlie(55000) Bob(61000) Alice(72000)"},
+  {o:"Sorted by name: Alice Bob Charlie"}
+ ],
+ better:{
+  naive:"Writing separate sort functions for each criteria would work but triplicates the actual sorting logic — any bug fix or optimization would need to be applied three times instead of once.",
+  improvements:[
+   "<b>The comparator-function-pointer pattern</b> (shown here) is exactly how C's standard library achieves generic, reusable sorting — this is the idiomatic C approach to what other languages solve with generics or higher-order functions.",
+   "<b>Add a cmpDept comparator</b> to extend sorting by department, following the exact same pattern — no changes needed to sortEmployees itself.",
+   "<b>For multi-key sorting</b> (e.g. by department, then by salary within department), a comparator can chain multiple comparisons, falling through to a secondary criterion only when the primary one ties."
+  ],
+  complexity:["Time: O(n log n) via qsort's underlying algorithm (regardless of which comparator is used)","Space: O(log n) typical for qsort's implementation (often introsort/quicksort variants)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why does cmpSalary use <code>(diff>0)-(diff<0)</code> instead of just returning <code>diff</code> directly?",
+   opts:["No real reason","diff is a float, but qsort's comparator must return an int — direct truncation could misbehave near zero or lose precision","Faster this way","Required syntax"],ans:1,
+   exp:"<b>Safe sign extraction.</b> Directly truncating a small float difference to int could round to 0 even when the values genuinely differ, misleading qsort. The explicit sign-based approach always returns a clean -1/0/1."},
+  {type:"spot-the-bug",q:"What is the main benefit of passing a comparator function pointer instead of writing three separate sort functions?",
+   opts:["No real benefit","The actual sorting algorithm is written ONCE and reused for any comparison criteria, avoiding duplicated logic","Comparator functions are faster","Required by C syntax"],ans:1,
+   exp:"<b>Avoids duplication.</b> The sorting mechanism (via qsort) is identical regardless of what's being compared — only the comparator changes, meaning bug fixes or improvements to the sort itself only need to happen in one place."},
+  {type:"fill-in-the-blank",q:"qsort's comparator functions must have the exact signature: two ____ parameters, returning an int.",
+   answer:"const void*",exp:"This generic pointer type lets qsort work with ANY data type, as long as the comparator correctly casts back to the real type internally."}
+ ]
+},
+{
+ id:"pq116", unit:"Unit 5", tab:"Q116 · File mode misconception",
+ title:"The 'w' mode append misconception",
+ question:"A student opens a file in 'w' mode intending to append. What actually happens? Then differentiate r,w,a,r+,w+,a+ modes by testing each.",
+ aim:"See concretely that 'w' truncates (erases) existing content, unlike 'a' which genuinely appends.",
+ file:"q116.c",
+ syntax:[
+  {tok:"\"w\" mode — truncates on open", why:"Write mode always starts from an empty file",
+   body:"Opening ANY existing file with 'w' immediately erases its entire contents (truncates to zero length) before you write anything — this happens the MOMENT fopen succeeds, regardless of what you write afterward.",
+   trap:"A student expecting 'w' to mean 'write more stuff, keeping what's there' is fundamentally misunderstanding the mode — 'w' literally means 'start fresh, erasing anything old'."},
+  {tok:"\"a\" mode — genuinely appends", why:"New writes go after existing content",
+   body:"Opening with 'a' positions all writes at the END of the existing file, preserving everything that was already there — this is the mode that actually does what the student intended.",
+   trap:"'a' mode ALSO creates the file if it doesn't exist yet (like 'w' does) — the difference is purely about what happens to EXISTING content."},
+  {tok:"the six standard modes: r,w,a,r+,w+,a+", why:"Read/write/append, with optional '+' for both directions",
+   body:"'r' reads only (file must exist). 'w' writes only, truncating. 'a' writes only, appending. Adding '+' to any of these enables BOTH reading and writing, with the base mode's positioning/truncation behavior still applying.",
+   trap:"'r+' requires the file to ALREADY exist (unlike 'w+' and 'a+', which create it if missing) — attempting 'r+' on a nonexistent file fails, just like plain 'r' does."}
+ ],
+ code:[
+  {t:'FILE*fp=<span class="fn">fopen</span>(<span class="str">"test.txt"</span>,<span class="str">"w"</span>); <span class="fn">fprintf</span>(fp,<span class="str">"Line 1\\n"</span>); <span class="fn">fclose</span>(fp);'},
+  {t:'fp=<span class="fn">fopen</span>(<span class="str">"test.txt"</span>,<span class="str">"w"</span>); <span class="cm">// student MISTAKENLY thinks this appends</span>',note:"This immediately truncates the file, erasing 'Line 1'.",hl:true},
+  {t:'<span class="fn">fprintf</span>(fp,<span class="str">"Line 2\\n"</span>); <span class="fn">fclose</span>(fp); <span class="cm">// this ERASES Line 1!</span>',hl:true},
+  {t:'<span class="cm">// Correct version using "a":</span>',hl:true},
+  {t:'fp=<span class="fn">fopen</span>(<span class="str">"test.txt"</span>,<span class="str">"w"</span>); <span class="fn">fprintf</span>(fp,<span class="str">"Line 1\\n"</span>); <span class="fn">fclose</span>(fp);'},
+  {t:'fp=<span class="fn">fopen</span>(<span class="str">"test.txt"</span>,<span class="str">"a"</span>); <span class="fn">fprintf</span>(fp,<span class="str">"Line 2\\n"</span>); <span class="fn">fclose</span>(fp); <span class="cm">// correctly appends</span>',note:"'a' mode preserves existing content and writes after it.",hl:true}
+ ],
+ mem:{
+  title:"Two 'w' opens vs. 'w' then 'a'",
+  vars:["file contents after 1st write","file contents after 2nd write (mode)"],
+  steps:[
+   {desc:"1st write ('w'): file contains 'Line 1'",set:{"file contents after 1st write":"Line 1"},chg:["file contents after 1st write"]},
+   {desc:"2nd write using 'w' AGAIN: truncates immediately — 'Line 1' is GONE the instant fopen succeeds",set:{"file contents after 2nd write (mode)":"Line 2 ONLY (Line 1 erased!)"},chg:["file contents after 2nd write (mode)"]},
+   {desc:"Repeating with 2nd write using 'a' INSTEAD: <span class='exec'>both lines preserved</span> — 'a' writes AFTER existing content",set:{"file contents after 2nd write (mode)":"Line 1\\nLine 2 (both preserved!)"},chg:["file contents after 2nd write (mode)"]}
+  ]
+ },
+ output:[
+  {o:"After two 'w' opens (misconception):"},
+  {o:"Line 2"},
+  {o:""},
+  {o:"Using 'a' correctly:"},
+  {o:"Line 1"},
+  {o:"Line 2"}
+ ],
+ better:{
+  naive:"This misconception is genuinely common among C beginners — the mode letter 'w' can intuitively (but wrongly) suggest 'write more', when it actually means 'start writing from an empty file'.",
+  improvements:[
+   "<b>Memorize the distinction explicitly</b>: 'w' = start fresh (truncate), 'a' = add to the end (preserve) — there's no shortcut, just memorization of this specific behavior.",
+   "<b>Test file mode behavior directly</b> (as this exercise does) rather than relying on assumptions — seeing the actual erasure firsthand cements the correct mental model.",
+   "<b>For the full mode set</b>, remember: base modes (r/w/a) control read-only vs write-only vs append-only access; adding '+' enables BOTH read and write for that same positioning behavior."
+  ],
+  complexity:["This is a semantic/correctness issue, not a performance one","Time/Space: O(1) mode selection, but wrong choice can silently destroy data"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"After writing 'Line 1' with 'w', then opening AGAIN with 'w' and writing 'Line 2', what does the file contain?",
+   opts:["Line 1\\nLine 2","Just Line 2 — Line 1 was erased","Just Line 1","An error"],ans:1,
+   exp:"<b>Just Line 2.</b> Opening with 'w' truncates the file immediately, regardless of what was there before — 'Line 1' is gone the moment the second fopen succeeds."},
+  {type:"spot-the-bug",q:"Which mode requires the file to ALREADY exist, unlike 'w+' and 'a+' which create it if missing?",
+   opts:["w","a","r+","a+"],ans:2,
+   exp:"<b>r+.</b> Since 'r+' is based on read mode, it requires an existing file (fopen fails/returns NULL otherwise) — unlike w+ and a+, which will create a new file if none exists."},
+  {type:"fill-in-the-blank",q:"To preserve existing file content and add new data after it, use mode '____' instead of 'w'.",
+   answer:"a",exp:"Append mode ('a') writes new data after existing content, rather than truncating the file first like 'w' does."}
+ ]
+},
+{
+ id:"pq117", unit:"Unit 5", tab:"Q117 · Relational table",
+ title:"A structure-based relational table: SELECT and PROJECT",
+ question:"Rows are structs, columns are fields. Implement SELECT (filter rows by condition) and PROJECT (extract specific fields) as C functions.",
+ aim:"Mimic two fundamental relational-database operations using plain structs and simple filtering/extraction functions.",
+ file:"q117.c",
+ syntax:[
+  {tok:"array of structs = a 'table'", why:"Each struct instance is a ROW, each field is a COLUMN",
+   body:"Treating <code>Row table[]</code> as a database table maps naturally: iterating the array visits each row, and accessing a specific field (like <code>.dept</code>) reads that row's value in that column.",
+   trap:"Unlike a real database, this in-memory array has no indexing, no query optimizer, and no persistence — it's a simplified conceptual model, not a production data store."},
+  {tok:"SELECT: filter rows by a condition", why:"The relational 'WHERE' operation",
+   body:"<code>selectByDept</code> scans every row and prints only those matching a condition (<code>dept==target</code>) — conceptually identical to SQL's <code>SELECT * WHERE dept=...</code>.",
+   trap:"This simple version only supports ONE specific condition (exact department match) — a more general SELECT would accept an arbitrary predicate function, similar to the comparator pattern in Q115."},
+  {tok:"PROJECT: extract only specific fields", why:"The relational column-selection operation",
+   body:"<code>projectNames</code> deliberately IGNORES most of each row's data, printing only the name field — conceptually identical to SQL's <code>SELECT name FROM table</code> (as opposed to <code>SELECT *</code>).",
+   trap:"PROJECT and SELECT solve different problems: SELECT filters WHICH ROWS appear, PROJECT filters WHICH COLUMNS appear — conflating the two is a common conceptual confusion."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">char</span> name[<span class="num">20</span>]; <span class="ty">int</span> age; <span class="ty">char</span> dept[<span class="num">20</span>]; } Row;',note:"Each Row is one 'record'; each field is a 'column'.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">selectByDept</span>(<span class="ty">const char</span>*dept){',note:"SELECT: filter WHICH ROWS appear based on a condition.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++) <span class="kw">if</span>(<span class="fn">strcmp</span>(table[i].dept,dept)==<span class="num">0</span>)'},
+  {t:'    <span class="fn">printf</span>(<span class="str">"  %s, %d, %s\\n"</span>, table[i].name, table[i].age, table[i].dept);'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">projectNames</span>(){',note:"PROJECT: filter WHICH COLUMNS appear — only prints the name field.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++) <span class="fn">printf</span>(<span class="str">"  %s\\n"</span>, table[i].name);'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Filtering rows (SELECT) vs extracting columns (PROJECT)",
+  vars:["operation","rows examined","output"],
+  steps:[
+   {desc:"selectByDept('Eng'): scans all 4 rows, checking dept field against 'Eng'",set:{operation:"SELECT",rows:"4 examined"},chg:["operation","rows"]},
+   {desc:"Alice(Eng) and Carol(Eng) match; Bob(Sales) and Dave(Sales) don't — <span class='exec'>only 2 rows printed, each showing ALL their fields</span>",set:{output:"Alice(30,Eng), Carol(35,Eng)"},chg:["output"]},
+   {desc:"projectNames(): scans ALL 4 rows unconditionally, but for EACH row only prints the name field",set:{operation:"PROJECT",output:"Alice, Bob, Carol, Dave (names only, all rows)"},chg:["operation","output"]}
+  ]
+ },
+ output:[
+  {o:"SELECT * WHERE dept='Eng':"},
+  {o:"  Alice, 30, Eng"},
+  {o:"  Carol, 35, Eng"},
+  {o:"PROJECT name:"},
+  {o:"  Alice"},{o:"  Bob"},{o:"  Carol"},{o:"  Dave"}
+ ],
+ better:{
+  naive:"This demo hardcodes ONE specific SELECT condition (dept match) and ONE specific PROJECT field (name) — a more general system would parameterize both.",
+  improvements:[
+   "<b>Generalize SELECT</b> to accept a predicate function pointer (like Q115's comparator pattern) so any condition (age range, name prefix, etc.) can be tested without rewriting selectByDept.",
+   "<b>Generalize PROJECT</b> to accept a list of which fields to include, rather than a hardcoded single field — closer to real SQL's flexible column selection.",
+   "<b>Combine SELECT and PROJECT</b> in sequence (filter rows, THEN extract specific fields from the surviving rows) to model more complex queries, just as SQL combines WHERE and column selection in one statement."
+  ],
+  complexity:["SELECT: O(n) — scans every row once","PROJECT: O(n) — also scans every row once, just extracting less data per row"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"How many rows does selectByDept('Eng') print, given the sample data {Alice-Eng,Bob-Sales,Carol-Eng,Dave-Sales}?",
+   opts:["1","2","3","4"],ans:1,
+   exp:"<b>2.</b> Only Alice and Carol have dept='Eng'; Bob and Dave (both Sales) are filtered out by the SELECT condition."},
+  {type:"spot-the-bug",q:"What's the fundamental difference between what SELECT and PROJECT each filter?",
+   opts:["No difference, they're the same","SELECT filters WHICH ROWS appear; PROJECT filters WHICH COLUMNS (fields) appear","SELECT is faster","PROJECT only works on numbers"],ans:1,
+   exp:"<b>Rows vs. columns.</b> SELECT decides which records pass a condition; PROJECT decides which fields of EVERY record get shown — they operate on different dimensions of the 'table' entirely."},
+  {type:"fill-in-the-blank",q:"In relational terms, PROJECT corresponds to choosing which ____ (fields) of the data to include in the output.",
+   answer:"columns",exp:"PROJECT extracts a subset of columns/fields, while SELECT extracts a subset of rows — the two are complementary, different operations."}
+ ]
+},
+{
+ id:"pq118", unit:"Unit 5", tab:"Q118 · File copy methods",
+ title:"Copying files: character-by-character vs buffered",
+ question:"Copy a file char by char; then rewrite using fread/fwrite with a buffer. Measure the system-call reduction conceptually. Handle same source/dest.",
+ aim:"Compare the simplest possible file copy against a buffered version, understanding why buffering matters for performance.",
+ file:"q118.c",
+ syntax:[
+  {tok:"fgetc/fputc — one character per call", why:"Simplest possible copy, but many small operations",
+   body:"Reading and writing ONE character at a time means the loop runs once per byte in the file — for a large file, that's potentially millions of individual read/write calls.",
+   trap:"While each fgetc/fputc call doesn't necessarily trigger a raw OS system call directly (stdio does its own internal buffering), the FUNCTION CALL overhead itself (not to mention any underlying buffering inefficiency) adds up across millions of iterations."},
+  {tok:"fread/fwrite with an explicit buffer", why:"Batch many bytes per operation",
+   body:"Reading/writing thousands of bytes (like 4096, a common buffer size) per fread/fwrite call means FAR fewer function calls overall — a file of 1 million bytes needs about 244 calls with a 4096-byte buffer, vs. potentially a million with char-by-char.",
+   trap:"Choosing a buffer size that's too large wastes memory for no additional benefit; too small doesn't fully capture the efficiency gain — 4KB-64KB is a common practical range."},
+  {tok:"handling same source and destination", why:"A subtle edge case",
+   body:"If source and destination happen to be the SAME file, naively reading and writing simultaneously could corrupt the data (reading already-overwritten bytes) — a robust copy function should detect and handle (or explicitly reject) this case.",
+   trap:"This exact scenario (accidentally copying a file onto itself) is an easy mistake for a caller to make, and a well-designed copy function should defend against it rather than silently producing corrupted output."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">copyCharByChar</span>(<span class="ty">const char</span>*src,<span class="ty">const char</span>*dst){'},
+  {t:'  FILE*in=<span class="fn">fopen</span>(src,<span class="str">"r"</span>); FILE*out=<span class="fn">fopen</span>(dst,<span class="str">"w"</span>);'},
+  {t:'  <span class="ty">int</span> c;'},
+  {t:'  <span class="kw">while</span>((c=<span class="fn">fgetc</span>(in))!=EOF) <span class="fn">fputc</span>(c,out);',note:"One character per loop iteration — potentially millions of calls.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">copyBuffered</span>(<span class="ty">const char</span>*src,<span class="ty">const char</span>*dst){'},
+  {t:'  FILE*in=<span class="fn">fopen</span>(src,<span class="str">"rb"</span>); FILE*out=<span class="fn">fopen</span>(dst,<span class="str">"wb"</span>);'},
+  {t:'  <span class="ty">char</span> buf[<span class="num">4096</span>]; <span class="ty">size_t</span> n;',note:"A 4KB buffer batches many bytes per operation."},
+  {t:'  <span class="kw">while</span>((n=<span class="fn">fread</span>(buf,<span class="num">1</span>,<span class="kw">sizeof</span>(buf),in))&gt;<span class="num">0</span>) <span class="fn">fwrite</span>(buf,<span class="num">1</span>,n,out);',note:"Far fewer iterations for the same file size — dramatically less call overhead.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Copying a file: iterations needed for each method",
+  vars:["method","bytes per operation","iterations for a 1MB file"],
+  steps:[
+   {desc:"copyCharByChar: 1 byte per fgetc/fputc pair",set:{method:"char-by-char","bytes per operation":"1","iterations for a 1MB file":"~1,048,576"},chg:["method","bytes per operation","iterations for a 1MB file"]},
+   {desc:"copyBuffered: up to 4096 bytes per fread/fwrite pair",set:{method:"buffered","bytes per operation":"up to 4096","iterations for a 1MB file":"~256"},chg:["method","bytes per operation","iterations for a 1MB file"]},
+   {desc:"<span class='exec'>~4000x fewer iterations</span> for the buffered version on this file size — the source of its real-world performance advantage",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"char-by-char copy: Hello, this is a test file for copying."},
+  {o:"buffered copy:     Hello, this is a test file for copying."},
+  {o:"Both copies identical: YES"},
+  {o:"Buffered version makes far fewer read/write system calls for large files."}
+ ],
+ better:{
+  naive:"Char-by-char copying is simple to write and understand but scales poorly for large files due to the sheer number of function call iterations required.",
+  improvements:[
+   "<b>Always prefer buffered I/O</b> (fread/fwrite with a reasonably-sized buffer) for any file copying beyond trivial sizes — the performance difference becomes very noticeable for large files.",
+   "<b>Detect same source/destination</b> explicitly (e.g. by comparing resolved absolute paths, or file inode numbers on Unix) and either refuse the operation or handle it specially (e.g. copy to a temp file first, then rename).",
+   "<b>For truly large files</b>, OS-level copy functions (like Linux's <code>sendfile</code> or platform-specific APIs) can be even more efficient than manual buffered copying, avoiding user-space buffer copies entirely."
+  ],
+  complexity:["char-by-char: O(n) iterations for n bytes","buffered: O(n/buffer_size) iterations — same total bytes moved, far fewer operations","Space: O(1) char-by-char, O(buffer_size) buffered"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"For a 1MB file, roughly how many fread/fwrite calls does the buffered version (4096-byte buffer) need, versus fgetc/fputc calls for char-by-char?",
+   opts:["Same number for both","~256 buffered vs ~1 million char-by-char","More buffered calls","Both need exactly 1 call"],ans:1,
+   exp:"<b>~256 vs ~1 million.</b> 1MB / 4096 bytes ≈ 256 buffered operations, versus one fgetc/fputc pair per single byte — roughly 4000x fewer calls with buffering."},
+  {type:"spot-the-bug",q:"Why is naively copying a file onto itself (same source and destination) potentially dangerous?",
+   opts:["No risk at all","Reading and writing to the same file simultaneously could read already-overwritten (corrupted) data","Only a problem for text files","Only a problem for binary files"],ans:1,
+   exp:"<b>Read-after-write corruption risk.</b> If you're reading from a position that's already been overwritten by an earlier write to the SAME file, you'd copy corrupted data instead of the original content."},
+  {type:"fill-in-the-blank",q:"Batching many bytes per fread/fwrite call instead of one byte at a time is called ____ I/O.",
+   answer:"buffered",exp:"Buffered I/O reduces the number of read/write operations needed, improving performance especially for large files."}
+ ]
+},
+{
+ id:"pq119", unit:"Unit 5", tab:"Q119 · Polynomial struct",
+ title:"Polynomial arithmetic with save/load in readable format",
+ question:"A struct stores degree and coefficient array. Add and multiply polynomials. Save/load in human-readable format like '3x^2+2x+1'.",
+ aim:"Represent polynomials as coefficient arrays, then implement the algebraic add/multiply rules directly on those arrays.",
+ file:"q119.c",
+ syntax:[
+  {tok:"coeffs[i] = coefficient of x^i", why:"Index directly encodes the power of x",
+   body:"Storing coefficients at the index matching their power (coeffs[2] is the x² coefficient, coeffs[0] is the constant term) makes addition and multiplication straightforward array operations.",
+   trap:"Off-by-one between 'degree' (highest power) and 'array size' (degree+1 slots needed, since it includes the x^0 term) is an easy indexing mistake."},
+  {tok:"addPoly: element-wise addition, handling different degrees", why:"Shorter polynomial is treated as having zero coefficients beyond its degree",
+   body:"When adding polynomials of DIFFERENT degrees, any power beyond the shorter one's degree is treated as having coefficient 0 — the result's degree is the LARGER of the two input degrees.",
+   trap:"Not handling this size mismatch (e.g. assuming both polynomials have the same degree) would either miss terms or access out-of-bounds array elements."},
+  {tok:"mulPoly: convolution-style accumulation", why:"Every term of A multiplies every term of B, summing into the right power",
+   body:"Multiplying two polynomials means each pair of terms (a's x^i term, b's x^j term) contributes to the RESULT's x^(i+j) term — accumulated via <code>r->coeffs[i+j] += a->coeffs[i]*b->coeffs[j]</code>.",
+   trap:"Forgetting to INITIALIZE the result's coefficients to 0 before accumulating would add onto garbage values instead of starting from a clean zero."}
+ ],
+ code:[
+  {t:'<span class="kw">typedef struct</span> { <span class="ty">int</span> degree; <span class="ty">float</span> coeffs[<span class="num">10</span>]; } Polynomial;',note:"coeffs[i] holds the coefficient of x^i.",hl:true},
+  {t:'<span class="ty">void</span> <span class="fn">addPoly</span>(Polynomial*a,Polynomial*b,Polynomial*r){'},
+  {t:'  r->degree = a->degree&gt;b->degree ? a->degree : b->degree;',note:"Result's degree is the LARGER of the two inputs."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;=r->degree;i++){'},
+  {t:'    <span class="ty">float</span> ac = i&lt;=a->degree? a->coeffs[i]:<span class="num">0</span>;',note:"Treat missing terms in the shorter polynomial as 0.",hl:true},
+  {t:'    <span class="ty">float</span> bc = i&lt;=b->degree? b->coeffs[i]:<span class="num">0</span>;'},
+  {t:'    r->coeffs[i]=ac+bc;'},
+  {t:'  }'},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">mulPoly</span>(Polynomial*a,Polynomial*b,Polynomial*r){'},
+  {t:'  r->degree=a->degree+b->degree;',note:"Product's degree is the SUM of the input degrees."},
+  {t:'  <span class="kw">for</span>(...) r->coeffs[i]=<span class="num">0</span>;',note:"MUST initialize before accumulating."},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;=a->degree;i++) <span class="kw">for</span>(<span class="ty">int</span> j=<span class="num">0</span>;j&lt;=b->degree;j++)'},
+  {t:'    r->coeffs[i+j]+=a->coeffs[i]*b->coeffs[j];',note:"Every term-pair contributes to the SUM of their powers.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Multiplying A=(3x²+2x+1) by B=(x)",
+  vars:["a.coeffs[i]","b.coeffs[j]","r.coeffs[i+j] contribution"],
+  steps:[
+   {desc:"a.coeffs=[1,2,3] (const,x,x²). b.coeffs=[0,1] (const=0, x-coeff=1)",set:{"a.coeffs[i]":"[1,2,3]","b.coeffs[j]":"[0,1]"},chg:["a.coeffs[i]","b.coeffs[j]"]},
+   {desc:"i=0(const=1), j=1(x-coeff=1): contributes to r.coeffs[0+1]=r.coeffs[1] += 1*1=1",set:{"r.coeffs[i+j] contribution":"r.coeffs[1]+=1"},chg:["r.coeffs[i+j] contribution"]},
+   {desc:"i=1(x-coeff=2), j=1: contributes to r.coeffs[2] += 2*1=2",set:{"r.coeffs[i+j] contribution":"r.coeffs[2]+=2"},chg:["r.coeffs[i+j] contribution"]},
+   {desc:"i=2(x²-coeff=3), j=1: contributes to r.coeffs[3] += 3*1=3. <span class='exec'>Final: 3x³+2x²+1x (matches x·(3x²+2x+1))</span>",set:{"r.coeffs[i+j] contribution":"r.coeffs[3]+=3"},chg:["r.coeffs[i+j] contribution"]}
+  ]
+ },
+ output:[
+  {o:"A = 3x^2 + 2x^1 + 1x^0"},
+  {o:"B = 1x^1 +"},
+  {o:"A+B = 3x^2 + 3x^1 + 1x^0"},
+  {o:"A*B = 3x^3 + 2x^2 + 1x^1 +"}
+ ],
+ better:{
+  naive:"Fixed-size coefficient arrays (coeffs[10]) cap the maximum representable degree — a general polynomial library would need dynamic sizing for arbitrarily large degrees.",
+  improvements:[
+   "<b>For save/load in the human-readable format</b> (mentioned in the question but not fully implemented here), you'd need both a formatter (struct→string, roughly what printPoly does) and a parser (string→struct, tokenizing terms like '3x^2').",
+   "<b>Dynamic coefficient arrays</b> (malloc'd based on actual degree) would remove the fixed size-10 cap for genuinely large polynomials.",
+   "<b>Trim trailing zero coefficients</b> after operations to keep the reported 'degree' accurate (e.g. if a subtraction cancels the highest-degree term entirely)."
+  ],
+  complexity:["Add: O(max degree)","Multiply: O(degree_a × degree_b) — a double loop over all term pairs","Space: O(max degree) for coefficient storage"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is (3x²+2x+1) + (x)?",
+   opts:["3x²+2x+1","3x²+3x+1","4x²+2x+1","3x³+2x+1"],ans:1,
+   exp:"<b>3x²+3x+1.</b> Adding x (coefficient 1 at power 1) to the existing 2x term gives 3x — the x² and constant terms are unaffected since B has no such terms."},
+  {type:"spot-the-bug",q:"Why must mulPoly's result coefficients be explicitly zeroed BEFORE the accumulation loops run?",
+   opts:["Unnecessary, they start at 0 automatically","Uninitialized array elements contain garbage; += onto garbage gives wrong results","Only matters for large polynomials","Style only"],ans:1,
+   exp:"<b>Garbage prevention.</b> Local/stack arrays aren't automatically zero-initialized in C; accumulating with += onto uninitialized garbage values would produce meaningless results."},
+  {type:"fill-in-the-blank",q:"When multiplying polynomials, a term from position i in A and position j in B contributes to the result's position ____.",
+   answer:"i+j",exp:"Multiplying x^i by x^j gives x^(i+j), so that term's product accumulates into the result's coefficient at index i+j."}
+ ]
+},
+{
+ id:"pq120", unit:"Unit 5", tab:"Q120 · Atomic writes",
+ title:"An in-memory database with atomic disk writes",
+ question:"After each operation (add/delete/update), write the entire database to disk atomically: write to a temp file, then rename. Why safer than direct writes?",
+ aim:"Use the write-to-temp-then-rename pattern to guarantee the original file is never left in a partially-written state.",
+ file:"q120.c",
+ syntax:[
+  {tok:"write to a .tmp file first", why:"Never touch the real file until the write fully succeeds",
+   body:"All new data is written to a SEPARATE temporary file — if the program crashes mid-write, only the temp file is corrupted; the real database file remains completely untouched and valid.",
+   trap:"If you wrote directly to the real file and crashed halfway through, the database would be left in a HALF-WRITTEN, corrupted state — potentially unrecoverable."},
+  {tok:"rename() as the atomic commit step", why:"Most filesystems guarantee rename is atomic",
+   body:"On POSIX-compliant filesystems, <code>rename()</code> is an ATOMIC operation — it either fully succeeds (the new name now points to the new file) or fully fails (nothing changes) — there's no possible 'half-renamed' state.",
+   trap:"This atomicity guarantee depends on the underlying filesystem — while true for most common systems, always verify guarantees for your specific target platform if this matters critically."},
+  {tok:"remove-then-rename sequence", why:"Clear the old name before claiming it",
+   body:"Removing the old <code>employees.db</code> before renaming the temp file to that name ensures no naming conflict — though on some systems, rename() can overwrite an existing file directly without a separate remove step.",
+   trap:"There's a brief window between remove() and rename() where NEITHER file exists at that name — for true bulletproof atomicity across all edge cases, some systems prefer a single rename-over-existing-file approach where supported."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">writeAtomic</span>(){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(<span class="str">"db.tmp"</span>,<span class="str">"w"</span>);',note:"Write to a SEPARATE temp file — never touch the real database yet.",hl:true},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;empCount;i++) <span class="fn">fprintf</span>(fp,<span class="str">"%d,%s,%.2f\\n"</span>, db[i].id,db[i].name,db[i].salary);'},
+  {t:'  <span class="fn">fclose</span>(fp);'},
+  {t:'  <span class="fn">remove</span>(<span class="str">"employees.db"</span>);   <span class="cm">// remove old version</span>'},
+  {t:'  <span class="fn">rename</span>(<span class="str">"db.tmp"</span>,<span class="str">"employees.db"</span>);',note:"Atomic on most filesystems — either fully renamed or not at all.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Why this protects against crash-mid-write corruption",
+  vars:["scenario","real database file state"],
+  steps:[
+   {desc:"Direct-write approach: writing straight to employees.db, program crashes HALFWAY through",set:{scenario:"direct write, crash mid-write","real database file state":"CORRUPTED — half-old, half-new, unreadable"},chg:["scenario","real database file state"]},
+   {desc:"Atomic approach: writing to db.tmp, program crashes HALFWAY through",set:{scenario:"atomic write, crash mid-write","real database file state":"UNTOUCHED — db.tmp is corrupt, but employees.db (the real file) is still the LAST GOOD version"},chg:["scenario","real database file state"]},
+   {desc:"Atomic approach: writing to db.tmp COMPLETES successfully, then rename() happens",set:{scenario:"atomic write, success","real database file state":"cleanly updated to the NEW version — rename is all-or-nothing"},chg:["scenario","real database file state"]}
+  ]
+ },
+ output:[
+  {o:"Database contents after atomic writes:"},
+  {o:"1,Alice,72000.00"},
+  {o:"2,Bob,61000.00"},
+  {o:"Why atomic: a crash mid-write leaves the ORIGINAL file untouched (temp file may be corrupt,"},
+  {o:"but rename() only happens after the temp write fully completes)."}
+ ],
+ better:{
+  naive:"Directly writing to the real database file on every update is simpler code, but leaves a genuine crash-corruption risk that the atomic pattern specifically eliminates.",
+  improvements:[
+   "<b>The temp-then-rename pattern</b> (shown here) is a well-established, industry-standard technique for crash-safe file updates — used by many real database and configuration systems.",
+   "<b>Consider fsync() before rename</b> on systems where you need an even stronger guarantee that the temp file's data has genuinely reached physical storage (not just the OS's in-memory write cache) before committing.",
+   "<b>For concurrent access</b> (multiple processes potentially writing simultaneously), additional locking mechanisms would be needed alongside this atomic-write pattern."
+  ],
+  complexity:["Time: O(n) to write n records — same as a direct write, plus one rename() call","Space: O(n) — briefly, both temp and (about-to-be-replaced) original file coexist on disk"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"If the program crashes WHILE writing to db.tmp (before rename happens), what state is the real employees.db file left in?",
+   opts:["Corrupted, half-written","Untouched — still the last successfully saved version","Deleted entirely","Empty"],ans:1,
+   exp:"<b>Untouched.</b> Since all new writes went to the SEPARATE db.tmp file, and rename() never happened (because the crash occurred before reaching that step), the real employees.db file remains exactly as it was before this update attempt."},
+  {type:"spot-the-bug",q:"Why is rename() specifically chosen as the 'commit' step, rather than just finishing the write and calling it done?",
+   opts:["No special reason","rename() is atomic on most filesystems — it's guaranteed to either fully succeed or fully fail, with no possible partial state","rename() is faster","Required by C syntax"],ans:1,
+   exp:"<b>Atomicity guarantee.</b> Unlike writing data (which can be interrupted mid-way, leaving partial content), rename() itself is an indivisible operation on most filesystems — there's no in-between state where the name partially points to the old or new file."},
+  {type:"fill-in-the-blank",q:"The overall pattern is: write to a ____ file first, then atomically rename it to replace the real file.",
+   answer:"temporary",exp:"Writing to a temp file first isolates any potential write-time corruption from the actual database file, which is only updated via the atomic rename step."}
+ ]
+},
+{
+ id:"pq121", unit:"Unit 5", tab:"Q121 · gets() vulnerabilities",
+ title:"The dangers of gets() for reading a filename",
+ question:"A student uses <code>gets(buffer)</code> to read a filename, then passes it to fopen. Identify at least 3 vulnerabilities. Rewrite using fgets with validation.",
+ aim:"Enumerate why gets() is so dangerous it was REMOVED from the C standard, and build a safe replacement.",
+ file:"q121.c",
+ syntax:[
+  {tok:"gets() has NO bounds checking — ever", why:"The fundamental, unfixable flaw",
+   body:"gets() reads characters until a newline, with absolutely no way to specify a maximum length — if the input is longer than the buffer, it overflows into adjacent memory with no warning, no error, nothing.",
+   trap:"This isn't a 'use carefully' function — it's IMPOSSIBLE to use gets() safely for arbitrary input, which is exactly why the C11 standard removed it entirely from the language."},
+  {tok:"path traversal via '..' sequences", why:"A filename isn't just a name — it can be a PATH",
+   body:"An attacker-supplied filename like <code>\"../../etc/passwd\"</code> could navigate OUTSIDE the intended directory, potentially reading or writing files far beyond what the program intended to access.",
+   trap:"Simply checking 'is this a valid filename format' isn't enough — you must specifically check for and reject directory-traversal sequences if the filename comes from an untrusted source."},
+  {tok:"no length limit enables buffer overflow attacks", why:"A classic security exploit vector",
+   body:"Historically, buffer overflows from functions like gets() have been exploited to overwrite return addresses on the stack, potentially allowing an attacker to execute arbitrary malicious code — this is not a hypothetical concern, but a real, historically-exploited class of vulnerability.",
+   trap:"Even if YOUR specific program 'seems fine', an attacker who can control the input length has a real avenue to attempt exploitation — the vulnerability isn't about your code's specific bugs, it's structural."},
+  {tok:"fgets(buffer, size, stdin) — the safe replacement", why:"Bounded reading with an explicit maximum length",
+   body:"<code>fgets</code> takes an explicit SIZE parameter, guaranteeing it will never write more than that many bytes into the buffer — completely eliminating the overflow risk that gets() has.",
+   trap:"fgets INCLUDES the trailing newline character in the buffer (unlike gets) — you typically need to explicitly strip it, often with <code>strcspn(buf,\"\\n\")</code>."}
+ ],
+ code:[
+  {t:'<span class="cm">// gets(buffer) vulnerabilities for a filename:</span>',hl:true},
+  {t:'<span class="cm">// 1. NO bounds checking -- a filename longer than buffer overflows it</span>'},
+  {t:'<span class="cm">// 2. No way to limit input length -- attacker-controlled overflow is possible</span>'},
+  {t:'<span class="cm">// 3. No validation of CONTENT -- path traversal like "../../etc/passwd" possible</span>'},
+  {t:'<span class="ty">char</span> filename[<span class="num">50</span>];'},
+  {t:'<span class="kw">if</span>(<span class="fn">fgets</span>(filename, <span class="kw">sizeof</span>(filename), stdin)){',note:"fgets bounds the read to sizeof(filename) — no overflow possible.",hl:true},
+  {t:'  filename[<span class="fn">strcspn</span>(filename, <span class="str">"\\n"</span>)] = <span class="str">\'\\0\'</span>;',note:"Strip the trailing newline that fgets includes (unlike gets)."},
+  {t:'  <span class="kw">if</span>(<span class="fn">strstr</span>(filename, <span class="str">".."</span>) != NULL){',note:"Explicitly reject path traversal attempts.",hl:true},
+  {t:'    ...reject...; <span class="kw">return</span> <span class="num">1</span>;'},
+  {t:'  }'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Why gets() has no defense against a too-long filename",
+  vars:["buffer size","input length","gets() behavior","fgets() behavior"],
+  steps:[
+   {desc:"buffer is sized for 50 bytes",set:{"buffer size":"50 bytes"},chg:["buffer size"]},
+   {desc:"Attacker provides a 500-character 'filename' string",set:{"input length":"500 characters"},chg:["input length"]},
+   {desc:"gets(): writes ALL 500 characters into the 50-byte buffer — <span class='exec'>massive buffer overflow, undefined behavior</span>",set:{"gets() behavior":"overflow — writes past buffer bounds"},chg:["gets() behavior"]},
+   {desc:"fgets(buffer,50,stdin): reads AT MOST 49 characters + null terminator — <span class='exec'>safely truncates, no overflow</span>",set:{"fgets() behavior":"safely capped at 49 chars"},chg:["fgets() behavior"]}
+  ]
+ },
+ output:[
+  {o:"Enter filename: myfile.txt"},
+  {o:"Safe filename accepted: 'myfile.txt'"},
+  {o:"--- testing path traversal rejection ---"},
+  {o:"Enter filename: ../../etc/passwd"},
+  {o:"Rejected: filename contains '..' (potential path traversal)"}
+ ],
+ better:{
+  naive:"gets() is so fundamentally unsafe that the C11 standard REMOVED it entirely from the language — there is no 'careful use' of gets(), only avoidance.",
+  improvements:[
+   "<b>Never use gets() under any circumstances</b> — not even in 'simple' programs, not even for 'trusted' input — the function itself is the vulnerability, regardless of context.",
+   "<b>Always bound your buffer reads</b> with fgets (or similarly bounds-checked functions) and always specify the buffer's actual size, not a guessed value.",
+   "<b>Validate CONTENT, not just length</b>, for anything that will be used as a file path, command, or other security-sensitive value — path traversal, injection, and similar attacks require checking WHAT was entered, not just HOW MUCH."
+  ],
+  complexity:["Time: O(input length) for reading and validating","Space: O(buffer size) — fixed and bounded, unlike gets()'s unbounded risk"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why was gets() completely REMOVED from the C11 standard, rather than just discouraged?",
+   opts:["It was slow","It has NO way to bound the input length, making buffer overflow unavoidable for sufficiently long input","It was rarely used","Compiler vendors disliked it"],ans:1,
+   exp:"<b>Structurally unsafe.</b> Unlike most 'dangerous but usable-with-care' functions, gets() provides absolutely no mechanism to limit how much it reads — any sufficiently long input WILL overflow the buffer, with no way to prevent it from within the function's design."},
+  {type:"spot-the-bug",q:"Why check for '..' in a filename before using it, beyond just checking the length is safe?",
+   opts:["Unnecessary if length is bounded","A safely-bounded filename can still contain '../' sequences enabling path traversal to unintended locations","Only matters for very long filenames","No real additional risk"],ans:1,
+   exp:"<b>Different vulnerability class.</b> Bounding length prevents buffer overflow, but says nothing about the CONTENT — a short, safely-sized string like '../../etc/passwd' can still navigate outside the intended directory."},
+  {type:"fill-in-the-blank",q:"The safe replacement for gets(buffer) is fgets(buffer, ____, stdin), which requires specifying the buffer's size explicitly.",
+   answer:"sizeof(buffer)",exp:"Providing the actual buffer size lets fgets guarantee it never writes beyond that boundary, eliminating the overflow risk entirely."}
+ ]
+},
+{
+ id:"pq122", unit:"Unit 5", tab:"Q122 · Grade Book app",
+ title:"A Grade Book with binary persistence and ranking",
+ question:"Struct for student (name,ID,grades[5]). Functions: add student, compute GPA, save to binary file, load from binary file, print ranked list.",
+ aim:"Combine binary serialization (writing the whole struct array as raw bytes) with a GPA-based ranking sort.",
+ file:"q122.c",
+ syntax:[
+  {tok:"fwrite(students, sizeof(Student), studentCount, fp)", why:"Serialize the ENTIRE struct array in one call",
+   body:"Rather than writing each field individually, this single fwrite call copies the raw bytes of ALL <code>studentCount</code> Student structs directly to disk — extremely efficient for structured binary data.",
+   trap:"This 'raw bytes' approach is NOT portable across different systems/compilers if struct padding, endianness, or type sizes differ — it works reliably for the SAME program on the SAME system, but isn't a universal interchange format."},
+  {tok:"writing the count BEFORE the data", why:"Self-describing file format",
+   body:"Storing <code>studentCount</code> as the first thing in the file means loadBinary() knows exactly how many Student structs to read back — no separate metadata file or guessing needed.",
+   trap:"Forgetting to write (or read back) this count first would leave loadBinary() with no way to know how many students to expect."},
+  {tok:"selection sort by GPA descending for ranking", why:"The same sort pattern from Unit 3, applied to a new field",
+   body:"Repeatedly finding the highest remaining GPA and swapping it into position builds a properly ranked list — identical algorithm to previous selection-sort exercises, just comparing a different field.",
+   trap:"This sort happens AFTER loading from binary — meaning the file itself doesn't need to store data in ranked order; ranking is computed fresh each time it's needed."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">saveBinary</span>(<span class="ty">const char</span>*fname){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(fname,<span class="str">"wb"</span>);'},
+  {t:'  <span class="fn">fwrite</span>(&amp;studentCount,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">1</span>,fp);',note:"Write the COUNT first — needed to know how many structs to read back later.",hl:true},
+  {t:'  <span class="fn">fwrite</span>(students,<span class="kw">sizeof</span>(Student),studentCount,fp);',note:"ONE call serializes the ENTIRE array's raw bytes.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">loadBinary</span>(<span class="ty">const char</span>*fname){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(fname,<span class="str">"rb"</span>);'},
+  {t:'  <span class="fn">fread</span>(&amp;studentCount,<span class="kw">sizeof</span>(<span class="ty">int</span>),<span class="num">1</span>,fp);',note:"Read the count first, symmetric to how it was saved.",hl:true},
+  {t:'  <span class="fn">fread</span>(students,<span class="kw">sizeof</span>(Student),studentCount,fp);'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Saving 3 students, then reloading",
+  vars:["studentCount (saved)","file contents","studentCount (loaded)"],
+  steps:[
+   {desc:"3 students added. saveBinary writes: [3][Student1 bytes][Student2 bytes][Student3 bytes]",set:{"studentCount (saved)":"3","file contents":"count + 3 struct blocks"},chg:["studentCount (saved)","file contents"]},
+   {desc:"loadBinary reads the count FIRST: studentCount=3 (matches what was saved)",set:{"studentCount (loaded)":"3"},chg:["studentCount (loaded)"]},
+   {desc:"Then reads exactly 3 Student-sized blocks — <span class='exec'>perfectly reconstructs all 3 students' full data</span>",set:{},chg:[]}
+  ]
+ },
+ output:[
+  {o:"1. Carol (ID:103) GPA=95.00"},
+  {o:"2. Alice (ID:101) GPA=88.40"},
+  {o:"3. Bob (ID:102) GPA=75.00"}
+ ],
+ better:{
+  naive:"Raw fwrite/fread of struct arrays is fast and simple but not portable across different compilers/architectures (due to padding and endianness differences) — fine for a single-system application, risky for data interchange.",
+  improvements:[
+   "<b>For cross-platform binary compatibility</b>, you'd need to serialize each field individually in a defined byte order, rather than relying on the compiler's in-memory struct layout.",
+   "<b>Add data integrity checks</b> (like a checksum) to detect corrupted or incompatible binary files before trusting their contents.",
+   "<b>Consider a text-based format</b> (like CSV or JSON) if portability and human-readability matter more than raw performance — binary is faster but far less flexible."
+  ],
+  complexity:["Save/Load: O(n) — proportional to student count, single bulk I/O operation","Ranking sort: O(n²) with selection sort (O(n log n) achievable with qsort)"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Why is studentCount written to the file BEFORE the actual student data?",
+   opts:["No particular reason","loadBinary needs to know how many Student structs to read back — this count tells it exactly how many","Alphabetical convention","Required by fwrite"],ans:1,
+   exp:"<b>Self-describing format.</b> Without knowing the count in advance, loadBinary would have no way to determine how many Student-sized blocks follow in the file — writing the count first solves this."},
+  {type:"spot-the-bug",q:"Is fwrite(students, sizeof(Student), studentCount, fp) fully portable to a DIFFERENT compiler or architecture?",
+   opts:["Yes, always portable","Not necessarily — struct padding, field sizes, and endianness can all differ across systems","Only fails for large structCount","Only fails for small structs"],ans:1,
+   exp:"<b>Not guaranteed portable.</b> The exact byte layout of a struct (including padding) can vary by compiler/platform, so raw binary serialization works reliably within the SAME system but may not transfer correctly to a different one."},
+  {type:"fill-in-the-blank",q:"Ranking students by GPA in descending order uses the same ____ sort pattern seen in earlier array-sorting exercises.",
+   answer:"selection",exp:"Repeatedly finding the maximum remaining value and swapping it into position is the selection sort algorithm, applied here to the GPA field."}
+ ]
+},
+{
+ id:"pq123", unit:"Unit 5", tab:"Q123 · Config file parser",
+ title:"A key=value configuration file reader",
+ question:"Parse 'key = value' pairs into a struct array. Support lookup by key. Handle missing files, malformed lines, and duplicate keys.",
+ aim:"Split each line on the first '=', trim whitespace, and handle the messy realities of real config file parsing.",
+ file:"q123.c",
+ syntax:[
+  {tok:"strchr(line,'=') locates the separator", why:"Find the FIRST equals sign to split key from value",
+   body:"<code>strchr</code> returns a pointer to the first occurrence of '=' in the line — everything before it is the key, everything after is the value.",
+   trap:"If a value itself contains '=' (like a URL with query parameters), splitting on the FIRST '=' is usually correct, but worth being aware of as a parsing assumption."},
+  {tok:"malformed line detection: no '=' found", why:"strchr returns NULL if there's no match",
+   body:"If a line doesn't contain '=' at all (garbage, a comment, or a typo), <code>eq</code> will be NULL — checking for this and skipping the line prevents crashes or nonsensical parsing.",
+   trap:"Not checking for NULL before using <code>eq</code> (like computing <code>eq-line</code> for the key length) would cause undefined behavior on a malformed line."},
+  {tok:"whitespace trimming around key and value", why:"Handle spacing conventions gracefully",
+   body:"Config files often have inconsistent spacing (<code>key = value</code> vs <code>key=value</code>) — trimming trailing spaces from the key and leading spaces from the value normalizes both styles to the same result.",
+   trap:"Skipping this trimming would make <code>\"host \"</code> (with trailing space) a DIFFERENT key from <code>\"host\"</code>, breaking lookups that don't exactly match the original spacing."},
+  {tok:"duplicate key handling: last value wins", why:"A deliberate, explicit policy choice",
+   body:"When parseLine encounters a key that ALREADY exists in the config array, it OVERWRITES that entry's value rather than adding a duplicate — meaning later occurrences in the file take precedence.",
+   trap:"This is a DESIGN DECISION, not an inherent requirement — some systems instead reject duplicate keys as an error, or keep the FIRST occurrence instead. Document your chosen policy clearly."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">parseLine</span>(<span class="ty">const char</span>*line){'},
+  {t:'  <span class="ty">const char</span>*eq=<span class="fn">strchr</span>(line,<span class="str">\'=\'</span>);'},
+  {t:'  <span class="kw">if</span>(!eq) <span class="kw">return</span>; <span class="cm">// malformed line — no \'=\' found, skip</span>',note:"Gracefully skip lines that don't match the expected format.",hl:true},
+  {t:'  <span class="cm">// ... extract and trim key, extract and trim value ...</span>'},
+  {t:'  <span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;configCount;i++) <span class="kw">if</span>(<span class="fn">strcmp</span>(config[i].key,key)==<span class="num">0</span>){'},
+  {t:'    <span class="fn">strcpy</span>(config[i].value,val); <span class="kw">return</span>; <span class="cm">// last value wins for duplicates</span>',note:"Explicit policy: overwrite existing entries rather than creating duplicates.",hl:true},
+  {t:'  }'},
+  {t:'  <span class="cm">// ...otherwise add as a new entry...</span>'},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Parsing a config file with a duplicate key",
+  vars:["line","key found?","config['host']"],
+  steps:[
+   {desc:"Line 1: 'host = localhost' → new entry: host='localhost'",set:{line:"host = localhost",'config[\'host\']':"localhost"},chg:["line","config['host']"]},
+   {desc:"Line 2: 'port=8080' → new entry: port='8080'",set:{line:"port=8080"},chg:["line"]},
+   {desc:"Line 3: 'malformed line no equals' → strchr finds NO '=' → <span class='exec'>skipped entirely</span>",set:{line:"malformed line no equals"},chg:["line"]},
+   {desc:"Line 4: 'host = overridden' → key 'host' ALREADY exists → <span class='exec'>overwrites: host='overridden'</span>",set:{line:"host = overridden","config['host']":"overridden"},chg:["line","config['host']"]}
+  ]
+ },
+ output:[
+  {o:"host = overridden"},
+  {o:"port = 8080"},
+  {o:"missing = (not found)"}
+ ],
+ better:{
+  naive:"Silent handling of malformed lines and duplicates (without any logging/warning) might hide genuine configuration mistakes from the user during development.",
+  improvements:[
+   "<b>Log warnings for malformed lines and duplicate keys</b> during parsing, rather than silently skipping/overwriting — helps catch configuration typos early.",
+   "<b>Support comments</b> (lines starting with # or //) as a common config file convention, explicitly skipping them rather than treating them as malformed.",
+   "<b>Consider strict mode</b> where duplicate keys or malformed lines cause the whole parse to FAIL rather than silently continuing — appropriate when configuration correctness is critical."
+  ],
+  complexity:["Time: O(n×k) — n lines, each requiring an O(k) linear search through k existing keys for duplicate detection","Space: O(k) for the config array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"Given the config file has 'host = localhost' then later 'host = overridden', what does lookup('host') return?",
+   opts:["localhost","overridden — last value wins","Both values somehow","Error, duplicate key"],ans:1,
+   exp:"<b>'overridden'.</b> The parser's policy is that later occurrences of the same key OVERWRITE earlier ones — a common (though not universal) convention for config file duplicate handling."},
+  {type:"spot-the-bug",q:"What happens if a line contains no '=' character at all?",
+   opts:["Crashes","strchr returns NULL, and the explicit check causes that line to be skipped gracefully","Creates an empty key","Uses the whole line as the key"],ans:1,
+   exp:"<b>Gracefully skipped.</b> strchr returns NULL when '=' isn't found; checking for this before proceeding prevents any attempt to process a malformed line."},
+  {type:"fill-in-the-blank",q:"This parser's duplicate-key policy is: the ____ occurrence in the file takes precedence.",
+   answer:"last",exp:"Each new occurrence of an existing key overwrites the previous value, so whichever appears LAST in the file wins."}
+ ]
+},
+{
+ id:"pq124", unit:"Unit 5", tab:"Q124 · Inventory persistence",
+ title:"Inventory management with crash-safe persistence",
+ question:"Inventory (item,qty,price) in a file. Support add, update, delete, print, total value. Design to avoid corruption on crashes.",
+ aim:"Combine CRUD operations on an in-memory array with the atomic write pattern to protect against data loss.",
+ file:"q124.c",
+ syntax:[
+  {tok:"in-memory array + reload-on-demand", why:"Fast operations, persistent storage",
+   body:"All CRUD operations work on the FAST in-memory array; each modification triggers a save to disk, but reads/queries don't need to touch the file at all — a common in-memory-cache-with-persistence pattern.",
+   trap:"If the program crashes between an in-memory modification and its corresponding save, that specific change could be lost — though the file itself (thanks to atomic writes) would never be CORRUPTED, just potentially slightly out of date."},
+  {tok:"saveInventoryAtomic reused after EVERY operation", why:"Consistent protection across add/update/delete",
+   body:"Rather than having separate save logic for each operation type, every mutating operation (addItem, updateQty) calls the SAME atomic save function — ensuring uniform crash protection everywhere.",
+   trap:"Forgetting to call the save function after any NEW mutating operation you add later would silently break the crash-safety guarantee for just that operation."},
+  {tok:"fscanf with a width-limited string format", why:"Safely parsing CSV-like lines",
+   body:"<code>%29[^,]</code> reads UP TO 29 characters, stopping at a comma — bounding the read prevents buffer overflow even if a line is malformed or unexpectedly long.",
+   trap:"Omitting the width limit (bare <code>%[^,]</code>) would have no bounds protection, risking overflow on malformed or malicious input data."}
+ ],
+ code:[
+  {t:'<span class="ty">void</span> <span class="fn">saveInventoryAtomic</span>(){'},
+  {t:'  FILE*fp=<span class="fn">fopen</span>(<span class="str">"inventory.tmp"</span>,<span class="str">"w"</span>);',note:"Write to temp file first — the atomic pattern from Q120.",hl:true},
+  {t:'  <span class="kw">for</span>(...) <span class="fn">fprintf</span>(fp,<span class="str">"%s,%d,%.2f\\n"</span>, inv[i].item,inv[i].qty,inv[i].price);'},
+  {t:'  <span class="fn">fclose</span>(fp);'},
+  {t:'  <span class="fn">remove</span>(<span class="str">"inventory.dat"</span>); <span class="fn">rename</span>(<span class="str">"inventory.tmp"</span>,<span class="str">"inventory.dat"</span>);',note:"Atomic commit — same crash-safety pattern as Q120.",hl:true},
+  {t:'}'},
+  {t:'<span class="ty">void</span> <span class="fn">addItem</span>(<span class="ty">const char</span>*name,<span class="ty">int</span> qty,<span class="ty">float</span> price){'},
+  {t:'  ...add to inv[] array...'},
+  {t:'  <span class="fn">saveInventoryAtomic</span>();',note:"EVERY mutating operation triggers the same atomic save.",hl:true},
+  {t:'}'},
+  {t:'<span class="cm">// Parsing when loading: fscanf(fp,"%29[^,],%d,%f\\n", ...) — width-limited to prevent overflow</span>',hl:true}
+ ],
+ mem:{
+  title:"Adding items, then updating quantity, then reloading",
+  vars:["operation","inv[] in memory","inventory.dat on disk"],
+  steps:[
+   {desc:"addItem('Widget',100,2.50): in-memory array updated AND saveInventoryAtomic() called immediately",set:{operation:"addItem",'inv[] in memory':"Widget:100@2.50","inventory.dat on disk":"Widget:100@2.50"},chg:["operation","inv[] in memory","inventory.dat on disk"]},
+   {desc:"addItem('Gadget',50,9.99): same pattern — memory AND disk both updated",set:{"inv[] in memory":"+Gadget:50@9.99","inventory.dat on disk":"+Gadget:50@9.99"},chg:["inv[] in memory","inventory.dat on disk"]},
+   {desc:"updateQty('Widget',80): memory updated to 80, saveInventoryAtomic() called AGAIN — <span class='exec'>disk always reflects the latest state</span>",set:{"inv[] in memory":"Widget:80@2.50","inventory.dat on disk":"Widget:80@2.50"},chg:["inv[] in memory","inventory.dat on disk"]}
+  ]
+ },
+ output:[
+  {o:"Inventory after reload:"},
+  {o:"Widget: qty=80 price=2.50"},
+  {o:"Gadget: qty=50 price=9.99"},
+  {o:"Total inventory value: $699.50"}
+ ],
+ better:{
+  naive:"Saving to disk after EVERY single operation is safe but can be slow for high-frequency updates — a real system might batch multiple changes before committing to disk.",
+  improvements:[
+   "<b>For very high update frequency</b>, consider batching multiple in-memory changes and committing to disk periodically (e.g. every N operations, or every few seconds) rather than after every single change — trades some crash-safety window for performance.",
+   "<b>Add a backup/versioning scheme</b> (keeping the last few saved versions) for recovery beyond just 'the most recent good state'.",
+   "<b>Validate data on load</b> (e.g. reject negative quantities or prices) to catch corruption or data entry errors that somehow made it into the file despite the atomic write protection."
+  ],
+  complexity:["Time: O(n) per save (rewrites the whole inventory each time)","Space: O(n) for the in-memory array"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"What is the total inventory value for Widget(qty=80,price=2.50) and Gadget(qty=50,price=9.99)?",
+   opts:["$500.00","$699.50","$450.00","$999.00"],ans:1,
+   exp:"<b>$699.50.</b> 80×2.50=200.00, plus 50×9.99=499.50, totaling 699.50."},
+  {type:"spot-the-bug",q:"Why does EVERY mutating operation (add, update) call the SAME saveInventoryAtomic function?",
+   opts:["No particular reason","Ensures consistent crash-safety protection is applied uniformly, regardless of which operation triggered the change","Faster this way","Required by C"],ans:1,
+   exp:"<b>Uniform protection.</b> By funneling every mutation through the same atomic-save function, you guarantee that NO operation accidentally bypasses the crash-safety mechanism — a single point of truth for how persistence works."},
+  {type:"fill-in-the-blank",q:"The width specifier in <code>%29[^,]</code> prevents ____ by capping how many characters are read into the buffer.",
+   answer:"buffer overflow",exp:"Limiting the read to 29 characters (fitting a 30-byte buffer with room for the null terminator) ensures fscanf never writes past the buffer's bounds."}
+ ]
+},
+{
+ id:"pq125", unit:"Unit 5", tab:"Q125 · Stock moving averages",
+ title:"CSV stock prices with moving average calculations",
+ question:"Read a CSV of stock prices (date,open,high,low,close) into a struct array. Compute 5-day and 10-day moving averages. Write to a new CSV, handling the first 4 days gracefully.",
+ aim:"Parse structured CSV data, then compute sliding-window averages that require enough historical data before they're meaningful.",
+ file:"q125.c",
+ syntax:[
+  {tok:"fscanf with a CSV format string", why:"Parse comma-separated fields directly",
+   body:"<code>%11[^,],%f,%f,%f,%f</code> reads a date string (up to 11 chars, stopping at comma) followed by four floats, all separated by commas — matching the CSV's exact structure.",
+   trap:"This format string is fragile to any deviation from the expected structure (extra spaces, missing fields, different date formats) — real-world CSV parsing often needs more defensive handling."},
+  {tok:"5-day/10-day moving average: only valid with enough history", why:"Can't average 5 days until you HAVE 5 days",
+   body:"MA5 only becomes computable starting from the 5th day (index 4, since arrays are 0-indexed) — before that, there simply isn't enough historical data to average over.",
+   trap:"Trying to compute MA5 too early (like on day 1) would either read out-of-bounds array data or need to somehow 'average' fewer than 5 values, which isn't a true 5-day average at all."},
+  {tok:"reporting N/A for insufficient history", why:"Honest handling of the 'not yet computable' case",
+   body:"Rather than showing a misleading partial average (or garbage), explicitly writing 'N/A' for days where the full window isn't yet available communicates the limitation clearly to anyone reading the report.",
+   trap:"Silently omitting the N/A rows (instead of showing them with a placeholder) could make it look like data is MISSING rather than simply 'not yet computable', confusing downstream consumers of the file."}
+ ],
+ code:[
+  {t:'<span class="cm">// Parsing: date, open, high, low, close</span>'},
+  {t:'<span class="fn">fscanf</span>(fp,<span class="str">"%11[^,],%f,%f,%f,%f\\n"</span>, data[n].date,&amp;data[n].open,&amp;data[n].high,&amp;data[n].low,&amp;data[n].close);',note:"CSV-matching format string parses each field directly.",hl:true},
+  {t:'<span class="kw">for</span>(<span class="ty">int</span> i=<span class="num">0</span>;i&lt;n;i++){'},
+  {t:'  <span class="ty">float</span> ma5=-<span class="num">1</span>, ma10=-<span class="num">1</span>;'},
+  {t:'  <span class="kw">if</span>(i&gt;=<span class="num">4</span>){ <span class="cm">// need at least 5 days of history (indices i-4 through i)</span>',note:"Only compute MA5 once there are 5 full days of data available.",hl:true},
+  {t:'    <span class="ty">float</span> s=<span class="num">0</span>; <span class="kw">for</span>(<span class="ty">int</span> k=i-<span class="num">4</span>;k&lt;=i;k++) s+=data[k].close; ma5=s/<span class="num">5</span>;'},
+  {t:'  }'},
+  {t:'  <span class="kw">if</span>(i&gt;=<span class="num">9</span>){ ... ma10 = ... }',note:"Similarly, MA10 needs 10 days of history."},
+  {t:'  <span class="kw">if</span>(ma5&lt;<span class="num">0</span>) <span class="fn">fprintf</span>(out,<span class="str">"%s,%.2f,N/A,N/A\\n"</span>, ...);',note:"Explicitly report N/A rather than a misleading partial value.",hl:true},
+  {t:'}'}
+ ],
+ mem:{
+  title:"Computing MA5 on day 5 (index 4) with closes [100,102,101,105,107,...]",
+  vars:["day index","sufficient history?","MA5"],
+  steps:[
+   {desc:"Day 0 (index 0): only 1 day of data. i<4 → <span class='exec'>MA5 = N/A</span>",set:{"day index":"0","sufficient history?":"no","MA5":"N/A"},chg:["day index","sufficient history?","MA5"]},
+   {desc:"Days 1,2,3 (indices 1,2,3): still less than 5 days total → all N/A",set:{"day index":"1-3","MA5":"N/A"},chg:["day index","MA5"]},
+   {desc:"Day 5 (index 4): NOW i>=4, so 5 full days exist (indices 0-4). Sum=100+102+101+105+107=515",set:{"day index":"4","sufficient history?":"yes"},chg:["day index","sufficient history?"]},
+   {desc:"MA5 = 515/5 = <span class='exec'>103.00</span> — the first day with a valid moving average",set:{"MA5":"103.00"},chg:["MA5"]}
+  ]
+ },
+ output:[
+  {o:"Moving averages report:"},
+  {o:"date,close,MA5,MA10"},
+  {o:"2026-01-01,100.00,N/A,N/A"},
+  {o:"2026-01-02,102.00,N/A,N/A"},
+  {o:"2026-01-03,101.00,N/A,N/A"},
+  {o:"2026-01-04,105.00,N/A,N/A"},
+  {o:"2026-01-05,107.00,103.00,N/A"},
+  {o:"2026-01-10,115.00,110.80,106.90"}
+ ],
+ better:{
+  naive:"Recomputing the full sum from scratch for every day's moving average (as done here) is O(window size) per day — a sliding-window technique that ADDS the new day and SUBTRACTS the oldest day would be O(1) per day instead.",
+  improvements:[
+   "<b>Use a true sliding window</b>: maintain a running sum, adding the newest close price and subtracting the one that's now outside the window — turns O(window) per day into O(1) per day, a meaningful optimization for long time series.",
+   "<b>Handle malformed CSV rows gracefully</b> (skip or report rows that don't match the expected format) rather than assuming every line parses cleanly.",
+   "<b>Extend to other technical indicators</b> (exponential moving average, RSI, etc.) using similar sliding-window or accumulator techniques."
+  ],
+  complexity:["Current: O(n × window size) — recomputes each average's full sum from scratch","Optimized (sliding window): O(n) total — O(1) per day","Space: O(n) to store all stock data"]
+ },
+ quiz:[
+  {type:"predict-the-output",q:"On which day (by index, 0-based) does MA5 first become computable?",
+   opts:["Index 0","Index 4 (the 5th day)","Index 5","Index 9"],ans:1,
+   exp:"<b>Index 4.</b> You need 5 full days of data (indices 0 through 4) before a genuine 5-day average is possible — that's exactly the 5th calendar day, at index 4."},
+  {type:"spot-the-bug",q:"Why report 'N/A' for the first 4 days' MA5, instead of just averaging however many days ARE available (like averaging just 1, 2, 3, or 4 days)?",
+   opts:["No real reason","Averaging fewer than 5 days isn't a genuine 5-day moving average — it would misrepresent what the number actually means","Faster to write N/A","Required by CSV format"],ans:1,
+   exp:"<b>Semantic honesty.</b> A '5-day moving average' specifically means exactly 5 days of data — averaging fewer days would be a DIFFERENT statistic entirely, and labeling it as MA5 would be misleading."},
+  {type:"fill-in-the-blank",q:"An optimized sliding-window approach would reduce the moving-average computation from O(n×window) to O(____) total.",
+   answer:"n",exp:"By maintaining a running sum (add the new value, subtract the value leaving the window) rather than resumming from scratch, each day's update becomes O(1), making the whole computation O(n) instead of O(n×window)."}
+ ]
+}
+];
+PRACTICE_U5.push(...PRACTICE_U5B);
 
 </script>
 <script>
 /* ================= C-LAB APP ================= */
-const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: (typeof PRACTICE_U3!=='undefined'?PRACTICE_U3:[]), 4: (typeof PRACTICE_U4!=='undefined'?PRACTICE_U4:[]), 5: [] };
+const PRACTICE = { 1: (typeof PRACTICE_U1!=='undefined'?PRACTICE_U1:[]), 2: (typeof PRACTICE_U2!=='undefined'?PRACTICE_U2:[]), 3: (typeof PRACTICE_U3!=='undefined'?PRACTICE_U3:[]), 4: (typeof PRACTICE_U4!=='undefined'?PRACTICE_U4:[]), 5: (typeof PRACTICE_U5!=='undefined'?PRACTICE_U5:[]) };
 const UNIT_RANGES = {1:"1–25",2:"26–50",3:"51–75",4:"76–100",5:"101–125"};
 
 const state = { mode:'lab', unit:1, active:0, done:new Set(), quizScore:0, quizMax:0, quizAnswered:new Set() };
